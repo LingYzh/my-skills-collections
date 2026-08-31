@@ -1,12 +1,12 @@
 ---
 name: vue-best-practices
-description: MUST be used for Vue.js tasks. Strongly recommends Vue 3 Composition API with `<script setup>` as the standard approach. Choose JavaScript or TypeScript by code stability and reuse scope: JavaScript for volatile business code, JavaScript with optional JSDoc for moderately stable shared code, and TypeScript for stable contract-heavy foundation code. Covers Vue 3, SSR, Volar, vue-tsc. Load for any Vue, .vue files, Vue Router, Pinia, or Vite with Vue work. ALWAYS use Composition API unless the project explicitly requires Options API.
+description: MUST be used for Vue.js tasks. Strongly recommends Vue 3 Composition API with `<script setup>` as the standard approach. Choose JavaScript or TypeScript by code stability and reuse scope: JavaScript for volatile business code, JavaScript with optional JSDoc for moderately stable shared code, and TypeScript for stable contract-heavy foundation code. Uses mandatory four-space indentation and prefers Promise chaining plus UI loading locks for async API/interface calls. Covers Vue 3, SSR, Volar, vue-tsc. Load for any Vue, .vue files, Vue Router, Pinia, or Vite with Vue work. ALWAYS use Composition API unless the project explicitly requires Options API.
 license: MIT
 metadata:
-  author: github.com/vuejs-ai
-  customized_by: github.com/LingYzh
-  upstream_version: "18.0.0"
-  version: "18.1.0-personal.1"
+    author: github.com/vuejs-ai
+    customized_by: github.com/LingYzh
+    upstream_version: "18.0.0"
+    version: "18.2.0-personal.2"
 ---
 
 # Vue Best Practices Workflow
@@ -20,12 +20,14 @@ Use this skill as an instruction set. Follow the workflow in order unless the us
 - **Avoid unnecessary re-renders:** use computed properties and watchers wisely.
 - **Readability counts:** write clear, self-documenting code.
 - **Language follows stability:** do not default all Vue code to TypeScript; choose JS, JS + JSDoc, or TS according to expected change frequency, reuse scope, API stability, and the cost of breaking consumers.
+- **Four-space indentation is mandatory:** use four ASCII spaces per indentation level in all authored or edited code; never use tabs for indentation.
+- **Async UI must be guarded:** prefer Promise chaining for API/interface calls and lock conflicting UI actions while the request is pending.
 
 ## 1) Confirm architecture before coding (required)
 
 - Default framework style: Vue 3 + Composition API + `<script setup>`.
 - Do **not** assume `<script setup lang="ts">` is the default.
-- Respect the existing project's local language conventions when editing existing code.
+- Respect the existing project's local language conventions when editing existing code, except for the mandatory four-space indentation policy in section `1.2`.
 - If the project explicitly uses Options API, load `vue-options-api-best-practices` skill if available.
 - If the project explicitly uses JSX, load `vue-jsx-best-practices` skill if available.
 
@@ -100,16 +102,27 @@ Additional rules:
 - TypeScript availability in the project is not, by itself, a reason to use it for every new file.
 - Explicit project requirements or user instructions override this tier policy.
 
-### 1.2 Must-read core references (required)
+### 1.2 Mandatory formatting policy (required)
+
+Use **four ASCII spaces per indentation level** in all code you create or edit.
+
+- Apply four-space indentation consistently to Vue templates, `<script>`, `<style>`, JavaScript, TypeScript, JSON, YAML, CSS, and other hand-maintained source/config files.
+- Never use tabs for indentation.
+- When editing a pre-existing file that uses 2-space or mixed indentation, normalize the **entire edited file** to four-space indentation before finishing. Do not leave mixed indentation behind.
+- Formatting cleanup caused by this rule is intentional and belongs in the same task/patch.
+- Do not reformat generated, vendored, minified, lock, or machine-managed files unless the task explicitly requires editing them.
+- This personal formatting rule overrides indentation shown in upstream examples or the surrounding project when a hand-maintained source/config file is edited.
+
+### 1.3 Must-read core references (required)
 
 - Before implementing any Vue task, make sure to read and apply these core references:
-  - `references/reactivity.md`
-  - `references/sfc.md`
-  - `references/component-data-flow.md`
-  - `references/composables.md`
+    - `references/reactivity.md`
+    - `references/sfc.md`
+    - `references/component-data-flow.md`
+    - `references/composables.md`
 - Keep these references in active working context for the entire task, not only when a specific issue appears.
 
-### 1.3 Plan component boundaries before coding (required)
+### 1.4 Plan component boundaries before coding (required)
 
 Create a brief component map before implementation for any non-trivial feature.
 
@@ -121,20 +134,21 @@ Create a brief component map before implementation for any non-trivial feature.
 
 ## 2) Apply essential Vue foundations (required)
 
-These are essential, must-know foundations. Apply all of them in every Vue task using the core references already loaded in section `1.2`.
+These are essential, must-know foundations. Apply all of them in every Vue task using the core references already loaded in section `1.3`.
 
 ### Reactivity
 
-- Must-read reference from `1.2`: [reactivity](references/reactivity.md)
+- Must-read reference from `1.3`: [reactivity](references/reactivity.md)
 - Keep source state minimal (`ref`/`reactive`), derive everything possible with `computed`.
 - Use watchers for side effects if needed.
 - Avoid recomputing expensive logic in templates.
 
 ### SFC structure and template safety
 
-- Must-read reference from `1.2`: [sfc](references/sfc.md)
+- Must-read reference from `1.3`: [sfc](references/sfc.md)
 - Keep SFC sections in this order: `<script>` → `<template>` → `<style>`.
 - Apply the language tier from section `1.1` when choosing `<script setup>` vs `<script setup lang="ts">`.
+- Apply four-space indentation from section `1.2` to the entire edited SFC, including template, script, and style blocks.
 - Keep SFC responsibilities focused; split large components.
 - Keep templates declarative; move branching/derivation to script.
 - Apply Vue template safety rules (`v-html`, list rendering, conditional rendering choices).
@@ -143,7 +157,7 @@ These are essential, must-know foundations. Apply all of them in every Vue task 
 
 Split a component when it has **more than one clear responsibility** (e.g. data orchestration + UI, or multiple independent UI sections).
 
-- Prefer **smaller components + composables** over one “mega component”
+- Prefer **smaller components + composables** over one “mega component”.
 - Move **UI sections** into child components (props in, events out).
 - Move **state/side effects** into composables (`useXxx()`).
 
@@ -158,15 +172,15 @@ Entry/root and route view rule:
 - Keep entry/root and route view components thin: app shell/layout, provider wiring, and feature composition.
 - Do not place full feature implementations in entry/root/view components when those features contain independent parts.
 - For CRUD/list features (todo, table, catalog, inbox), split at least into:
-  - feature container component
-  - input/form component
-  - list (and/or item) component
-  - footer/actions or filter/status component
+    - feature container component
+    - input/form component
+    - list (and/or item) component
+    - footer/actions or filter/status component
 - Allow a single-file implementation only for very small throwaway demos; if chosen, explicitly justify why splitting is unnecessary.
 
 ### Component data flow
 
-- Must-read reference from `1.2`: [component-data-flow](references/component-data-flow.md)
+- Must-read reference from `1.3`: [component-data-flow](references/component-data-flow.md)
 - Use props down, events up as the primary model.
 - Use `v-model` only for true two-way component contracts.
 - Use provide/inject only for deep-tree dependencies or shared context.
@@ -174,12 +188,25 @@ Entry/root and route view rule:
 
 ### Composables
 
-- Must-read reference from `1.2`: [composables](references/composables.md)
+- Must-read reference from `1.3`: [composables](references/composables.md)
 - Extract logic into composables when it is reused, stateful, or side-effect heavy.
 - Keep composable APIs small and predictable.
 - Use JavaScript for volatile feature composables, JavaScript + optional JSDoc for moderately stable shared composables, and TypeScript for stable library-like composables.
 - Do not introduce TypeScript solely for editor hints when JSDoc or runtime contracts are sufficient.
 - Separate feature logic from presentational components.
+
+### Async API/interface calls and UI loading locks
+
+When a Vue UI triggers an asynchronous API/interface request, load and apply [async-interface-ui](references/async-interface-ui.md).
+
+- Prefer Promise chaining (`.then().catch().finally()`) for API/interface calls by default.
+- Use `async` / `await` only when chaining would make the control flow materially harder to read or when an external API requires it.
+- Set an operation-specific loading state before starting the request.
+- Guard handlers against duplicate invocation while loading.
+- Block duplicate or conflicting user actions while the request is pending.
+- Reflect the lock in the UI with `disabled`, loading indicators, or equivalent interaction guards.
+- Release the lock in `.finally()` so both success and failure paths restore the UI.
+- Keep unrelated UI usable when it is safe; prefer operation-scoped locks over freezing the whole page.
 
 ## 3) Consider optional features only when requirements call for them
 
@@ -193,10 +220,10 @@ Do not add these by default. Load the matching reference only when the requireme
 - Built-in component `<Teleport>` for overlays/portals -> [component-teleport](references/component-teleport.md)
 - Built-in component `<Suspense>` for async subtree fallback boundaries -> [component-suspense](references/component-suspense.md)
 - Animation-related features: pick the simplest approach that matches the required motion behavior.
-  - Built-in component `<Transition>` for enter/leave effects -> [transition](references/component-transition.md)
-  - Built-in component `<TransitionGroup>` for animated list mutations -> [transition-group](references/component-transition-group.md)
-  - Class-based animation for non-enter/leave effects -> [animation-class-based-technique](references/animation-class-based-technique.md)
-  - State-driven animation for user-input-driven animation -> [animation-state-driven-technique](references/animation-state-driven-technique.md)
+    - Built-in component `<Transition>` for enter/leave effects -> [transition](references/component-transition.md)
+    - Built-in component `<TransitionGroup>` for animated list mutations -> [transition-group](references/component-transition-group.md)
+    - Class-based animation for non-enter/leave effects -> [animation-class-based-technique](references/animation-class-based-technique.md)
+    - State-driven animation for user-input-driven animation -> [animation-state-driven-technique](references/animation-state-driven-technique.md)
 
 ### 3.2 Less-common optional features
 
@@ -223,6 +250,7 @@ Performance work is a post-functionality pass. Do not optimize before core behav
 - All must-read references were read and applied.
 - The chosen JS/JSDoc/TS tier matches the code's stability and responsibility.
 - No incidental JavaScript ↔ TypeScript migration was introduced.
+- Every edited hand-maintained code/config file uses four-space indentation consistently.
 - Reactivity model is minimal and predictable.
 - SFC structure and template rules are followed.
 - Components are focused and well-factored, splitting when needed.
@@ -231,5 +259,6 @@ Performance work is a post-functionality pass. Do not optimize before core behav
 - Data flow contracts are explicit and expressed appropriately for the selected language tier.
 - Composables are used where reuse/complexity justifies them.
 - Moved state/side effects into composables if applicable.
+- Async API/interface calls prefer Promise chaining and have a correct loading/interaction lock when they can be triggered from the UI.
 - Optional features are used only when requirements demand them.
 - Performance changes were applied only after functionality was complete.

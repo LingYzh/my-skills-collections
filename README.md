@@ -12,18 +12,18 @@
 
 | Skill | 用途 | Local | Upstream | 同步状态 | 本地状态 |
 | --- | --- | --- | --- | --- | --- |
-| [`vue-best-practices`](./skills/vue-best-practices/) | Vue 3 / Composition API 开发最佳实践 | **v18.1.0-personal.1** | **v18.0.0** | 🔵 **Customized** | 已开始个人定制：按稳定性选择 JS / JSDoc / TS |
+| [`vue-best-practices`](./skills/vue-best-practices/) | Vue 3 / Composition API 开发最佳实践 | **v18.2.0-personal.2** | **v18.0.0** | 🔵 **Customized** | ✅ **Active** |
 
 ## Skill Details
 
 ### vue-best-practices
 
-Vue 3 开发工作流与最佳实践 Skill，覆盖响应式、SFC、组件数据流、Composables、状态管理、异步组件、动画及性能优化等主题。
+Vue 3 开发工作流与最佳实践 Skill，覆盖响应式、SFC、组件数据流、Composables、状态管理、异步接口交互、异步组件、动画及性能优化等主题。
 
 - **Local path:** [`skills/vue-best-practices/`](./skills/vue-best-practices/)
 - **Upstream:** [`vuejs-ai/skills`](https://github.com/vuejs-ai/skills/tree/main/skills/vue-best-practices)
 - **Upstream branch:** `main`
-- **Local version:** `18.1.0-personal.1`
+- **Local version:** `18.2.0-personal.2`
 - **Based on upstream version:** `18.0.0`
 - **Sync state:** Customized
 - **License:** MIT
@@ -36,11 +36,19 @@ Vue 3 开发工作流与最佳实践 Skill，覆盖响应式、SFC、组件数�
 #### Current customizations
 
 1. **Stability-driven JavaScript / TypeScript policy**
-   - **Business / volatile:** default to JavaScript for pages, route views, CRUD/forms/dashboards, feature-specific components and feature-specific composables.
-   - **Shared / moderately stable:** default to JavaScript with optional JSDoc at meaningful public boundaries.
-   - **Foundation / stable contract:** prefer TypeScript for low-change, broadly reused, contract-heavy components/composables/infrastructure.
-   - Never migrate JavaScript ↔ TypeScript as an incidental refactor; migration must be explicit or technically justified.
-   - Existing local project conventions take priority when modifying existing files.
+    - **Business / volatile:** default to JavaScript for pages, route views, CRUD/forms/dashboards, feature-specific components and feature-specific composables.
+    - **Shared / moderately stable:** default to JavaScript with optional JSDoc at meaningful public boundaries.
+    - **Foundation / stable contract:** prefer TypeScript for low-change, broadly reused, contract-heavy components/composables/infrastructure.
+    - Never migrate JavaScript ↔ TypeScript as an incidental refactor; migration must be explicit or technically justified.
+    - Existing local project conventions take priority when modifying existing files.
+
+2. **Four-space indentation**
+    - All authored or edited hand-maintained code uses four ASCII spaces per indentation level.
+    - Editing a legacy 2-space or mixed-indentation file also normalizes the entire edited file to four spaces.
+
+3. **Async API/interface interaction policy**
+    - Prefer Promise chaining (`then/catch/finally`) for API/interface calls.
+    - UI-triggered requests use loading/disabled interaction locks and release them in `finally()`.
 
 This Skill is now intentionally different from upstream. Upstream version/commit/tree information above is retained as the baseline for future comparison and selective rebasing.
 
@@ -76,6 +84,7 @@ my-skills-collections/
     └── vue-best-practices/
         ├── SKILL.md
         └── references/
+            └── async-interface-ui.md
 ```
 
 后续新增 Skill 时统一放入 `skills/<skill-name>/`，并在本 README 的 Skills 表格中登记来源、版本和同步状态。
