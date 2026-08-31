@@ -99,7 +99,7 @@ export interface UseHiddenOptions {
   syncAria?: boolean
 }
 
-export function UseHidden(
+export function useHidden(
   target?: MaybeRefOrGetter<HTMLElement | null | undefined>,
   options: UseHiddenOptions = {},
 )
