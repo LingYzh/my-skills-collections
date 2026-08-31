@@ -12,7 +12,7 @@
 
 | Skill | 用途 | Local | Upstream | 同步状态 | 本地状态 |
 | --- | --- | --- | --- | --- | --- |
-| [`vue-best-practices`](./skills/vue-best-practices/) | Vue 3 / Composition API 开发最佳实践 | **v18.2.0-personal.2** | **v18.0.0** | 🔵 **Customized** | ✅ **Active** |
+| [`vue-best-practices`](./skills/vue-best-practices/) | Vue 3 / Composition API 开发最佳实践 | **v18.3.0-personal.3** | **v18.0.0** | 🔵 **Customized** | ✅ **Active** |
 
 ## Skill Details
 
@@ -23,7 +23,7 @@ Vue 3 开发工作流与最佳实践 Skill，覆盖响应式、SFC、组件数�
 - **Local path:** [`skills/vue-best-practices/`](./skills/vue-best-practices/)
 - **Upstream:** [`vuejs-ai/skills`](https://github.com/vuejs-ai/skills/tree/main/skills/vue-best-practices)
 - **Upstream branch:** `main`
-- **Local version:** `18.2.0-personal.2`
+- **Local version:** `18.3.0-personal.3`
 - **Based on upstream version:** `18.0.0`
 - **Sync state:** Customized
 - **License:** MIT
@@ -45,10 +45,12 @@ Vue 3 开发工作流与最佳实践 Skill，覆盖响应式、SFC、组件数�
 2. **Four-space indentation**
     - All authored or edited hand-maintained code uses four ASCII spaces per indentation level.
     - Editing a legacy 2-space or mixed-indentation file also normalizes the entire edited file to four spaces.
+    - Editable formatter/linter/editor settings are aligned to four spaces so tooling does not revert source indentation.
 
 3. **Async API/interface interaction policy**
     - Prefer Promise chaining (`then/catch/finally`) for API/interface calls.
-    - UI-triggered requests use loading/disabled interaction locks and release them in `finally()`.
+    - UI-triggered requests use loading/disabled interaction locks.
+    - In uni-app, `uni.hideLoading()` must run before a following `uni.showToast()`; `finally()` is reserved for releasing the application-level reactive/business lock in that flow.
 
 This Skill is now intentionally different from upstream. Upstream version/commit/tree information above is retained as the baseline for future comparison and selective rebasing.
 

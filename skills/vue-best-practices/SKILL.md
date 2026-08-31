@@ -1,12 +1,12 @@
 ---
 name: vue-best-practices
-description: MUST be used for Vue.js tasks. Strongly recommends Vue 3 Composition API with `<script setup>` as the standard approach. Choose JavaScript or TypeScript by code stability and reuse scope: JavaScript for volatile business code, JavaScript with optional JSDoc for moderately stable shared code, and TypeScript for stable contract-heavy foundation code. Uses mandatory four-space indentation and prefers Promise chaining plus UI loading locks for async API/interface calls. Covers Vue 3, SSR, Volar, vue-tsc. Load for any Vue, .vue files, Vue Router, Pinia, or Vite with Vue work. ALWAYS use Composition API unless the project explicitly requires Options API.
+description: MUST be used for Vue.js tasks. Strongly recommends Vue 3 Composition API with `<script setup>` as the standard approach. Choose JavaScript or TypeScript by code stability and reuse scope: JavaScript for volatile business code, JavaScript with optional JSDoc for moderately stable shared code, and TypeScript for stable contract-heavy foundation code. Uses mandatory four-space indentation, prefers Promise chaining plus UI loading locks for async API/interface calls, and applies uni-app-specific loading/toast ordering. Covers Vue 3, SSR, Volar, vue-tsc. Load for any Vue, .vue files, Vue Router, Pinia, Vite with Vue, or uni-app Vue work. ALWAYS use Composition API unless the project explicitly requires Options API.
 license: MIT
 metadata:
     author: github.com/vuejs-ai
     customized_by: github.com/LingYzh
     upstream_version: "18.0.0"
-    version: "18.2.0-personal.2"
+    version: "18.3.0-personal.3"
 ---
 
 # Vue Best Practices Workflow
@@ -22,6 +22,7 @@ Use this skill as an instruction set. Follow the workflow in order unless the us
 - **Language follows stability:** do not default all Vue code to TypeScript; choose JS, JS + JSDoc, or TS according to expected change frequency, reuse scope, API stability, and the cost of breaking consumers.
 - **Four-space indentation is mandatory:** use four ASCII spaces per indentation level in all authored or edited code; never use tabs for indentation.
 - **Async UI must be guarded:** prefer Promise chaining for API/interface calls and lock conflicting UI actions while the request is pending.
+- **Platform lifecycle rules override generic cleanup placement:** for uni-app loading + toast flows, hide the native loading prompt before showing the toast; keep only the application-level lock cleanup in `finally()`.
 
 ## 1) Confirm architecture before coding (required)
 
@@ -112,6 +113,17 @@ Use **four ASCII spaces per indentation level** in all code you create or edit.
 - Formatting cleanup caused by this rule is intentional and belongs in the same task/patch.
 - Do not reformat generated, vendored, minified, lock, or machine-managed files unless the task explicitly requires editing them.
 - This personal formatting rule overrides indentation shown in upstream examples or the surrounding project when a hand-maintained source/config file is edited.
+
+#### Keep formatter/linter/editor configuration aligned to four spaces
+
+Do not allow project tooling to silently restore 2-space or tab indentation after code has been normalized.
+
+- If an editable project-controlled formatter/editor/linter configuration conflicts with this policy, update the relevant indentation setting to four spaces when necessary to keep edited source stable.
+- For EditorConfig, use `indent_style = space` and `indent_size = 4` for hand-maintained source/config files.
+- For Prettier, use `tabWidth: 4` and `useTabs: false`.
+- For ESLint / eslint-plugin-vue indentation rules, configure the applicable JavaScript, Vue `<template>`, and Vue `<script>` indentation width to `4`.
+- If Prettier is the authoritative formatter, avoid maintaining conflicting ESLint formatting rules; configure Prettier to four spaces and disable conflicting indentation rules instead of letting two tools fight each other.
+- Do not preserve a project-level `2` merely because it existed before if it controls files being actively edited under this personal Skill.
 
 ### 1.3 Must-read core references (required)
 
@@ -205,8 +217,10 @@ When a Vue UI triggers an asynchronous API/interface request, load and apply [as
 - Guard handlers against duplicate invocation while loading.
 - Block duplicate or conflicting user actions while the request is pending.
 - Reflect the lock in the UI with `disabled`, loading indicators, or equivalent interaction guards.
-- Release the lock in `.finally()` so both success and failure paths restore the UI.
+- Release the **application-level reactive/business lock** in `.finally()` so both success and failure paths restore interaction state.
 - Keep unrelated UI usable when it is safe; prefer operation-scoped locks over freezing the whole page.
+- In uni-app, if `uni.showLoading()` is followed by `uni.showToast()`, call `uni.hideLoading()` **before** the toast in each success/failure path. Do not put the only `uni.hideLoading()` after the toast in `.finally()` because the shared prompt layer can cause the toast to be closed or suppressed.
+- For uni-app, `.finally()` should normally restore the reactive/business lock (`isLoading`, `isSubmitting`, etc.); native prompt teardown follows the required platform order described in the reference.
 
 ## 3) Consider optional features only when requirements call for them
 
@@ -251,6 +265,7 @@ Performance work is a post-functionality pass. Do not optimize before core behav
 - The chosen JS/JSDoc/TS tier matches the code's stability and responsibility.
 - No incidental JavaScript ↔ TypeScript migration was introduced.
 - Every edited hand-maintained code/config file uses four-space indentation consistently.
+- Project-controlled formatter/linter/editor indentation settings do not undo the mandatory four-space policy for edited source.
 - Reactivity model is minimal and predictable.
 - SFC structure and template rules are followed.
 - Components are focused and well-factored, splitting when needed.
@@ -260,5 +275,6 @@ Performance work is a post-functionality pass. Do not optimize before core behav
 - Composables are used where reuse/complexity justifies them.
 - Moved state/side effects into composables if applicable.
 - Async API/interface calls prefer Promise chaining and have a correct loading/interaction lock when they can be triggered from the UI.
+- uni-app flows that combine `uni.showLoading()` and `uni.showToast()` hide the loading prompt before showing the toast; `finally()` only handles the application-level lock unless no toast ordering constraint exists.
 - Optional features are used only when requirements demand them.
 - Performance changes were applied only after functionality was complete.

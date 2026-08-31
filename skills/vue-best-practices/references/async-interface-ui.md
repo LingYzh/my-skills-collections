@@ -3,12 +3,12 @@ title: Async API Calls and UI Loading Locks
 impact: HIGH
 impactDescription: Unguarded async UI actions cause duplicate submissions, conflicting state changes, and race-condition bugs
 type: best-practice
-tags: [vue3, async, api, promise, loading, disabled, ui-lock, race-condition]
+tags: [vue3, async, api, promise, loading, disabled, ui-lock, race-condition, uni-app]
 ---
 
 # Async API Calls and UI Loading Locks
 
-**Impact: HIGH** - UI-triggered API/interface calls must prevent duplicate or conflicting user actions while the request is pending. Prefer Promise chaining for request flow and always restore the UI lock in `finally()`.
+**Impact: HIGH** - UI-triggered API/interface calls must prevent duplicate or conflicting user actions while the request is pending. Prefer Promise chaining for request flow. Restore application-level loading/interaction locks in `finally()`, while respecting platform-specific loading/toast lifecycle rules.
 
 ## Task List
 
@@ -17,9 +17,10 @@ tags: [vue3, async, api, promise, loading, disabled, ui-lock, race-condition]
 - Guard the handler against duplicate execution while loading
 - Disable or otherwise lock conflicting UI controls during the request
 - Show a loading state when the operation is user-visible
-- Release the lock in `.finally()` for both success and failure paths
+- Release application-level state locks in `.finally()` for both success and failure paths
 - Keep unrelated actions enabled when they cannot conflict
 - Use a request token/counter instead of a single boolean if overlapping requests are intentionally allowed
+- In uni-app, hide `uni.showLoading()` before calling `uni.showToast()`; do not rely on a later `uni.hideLoading()` in `.finally()`
 
 ## Default Pattern
 
@@ -113,9 +114,9 @@ If the same operation can be triggered from several controls, they must share th
 
 For navigation, destructive actions, form mutation, or other interactions that would invalidate the pending request, disable or guard those actions until the request settles.
 
-## Always Unlock in `finally()`
+## Use `finally()` for Application-Level Lock Cleanup
 
-Do not duplicate unlock logic in both success and error handlers.
+Do not duplicate application-level reactive lock cleanup in both success and error handlers.
 
 **BAD:**
 
@@ -144,7 +145,104 @@ requestApi()
     })
 ```
 
-`finally()` is the canonical cleanup point because it runs after either fulfillment or rejection.
+`finally()` is the normal cleanup point for application-level flags because it runs after either fulfillment or rejection. Platform-native loading/toast APIs can have additional ordering constraints; apply the platform-specific rules below instead of mechanically putting every cleanup call in `finally()`.
+
+## uni-app: Hide Loading Before `showToast`
+
+In uni-app, `uni.showLoading()` and `uni.showToast()` can share the same underlying prompt layer on mini-program-style implementations. DCloud staff has explicitly noted that these two APIs overwrite each other and that `uni.hideLoading()` can also close a toast.
+
+Therefore, when a request uses both `uni.showLoading()` and `uni.showToast()`:
+
+- call `uni.hideLoading()` **before** `uni.showToast()` on both success and failure paths
+- do **not** place the only `uni.hideLoading()` after `showToast()` in `.finally()`
+- keep the application-level `isLoading` / `isSubmitting` lock cleanup in `.finally()`
+- when using `uni.showLoading()` to block interaction, prefer `mask: true` where the target platform supports it
+- still keep a handler-level duplicate-entry guard; the visual mask is not a substitute for state-level protection
+
+**BAD:**
+
+```js
+uni.showLoading({
+    title: '提交中',
+    mask: true
+})
+
+isSubmitting.value = true
+
+submitApi()
+    .then(() => {
+        uni.showToast({
+            title: '提交成功',
+            icon: 'success'
+        })
+    })
+    .catch(() => {
+        uni.showToast({
+            title: '提交失败',
+            icon: 'none'
+        })
+    })
+    .finally(() => {
+        uni.hideLoading()
+        isSubmitting.value = false
+    })
+```
+
+The later `uni.hideLoading()` can close or suppress the toast because the loading and toast prompt layers are not independent on affected targets.
+
+**GOOD:**
+
+```js
+function submitForm() {
+    if (isSubmitting.value) return
+
+    isSubmitting.value = true
+
+    uni.showLoading({
+        title: '提交中',
+        mask: true
+    })
+
+    submitApi()
+        .then((result) => {
+            applyResult(result)
+
+            uni.hideLoading()
+            uni.showToast({
+                title: '提交成功',
+                icon: 'success'
+            })
+        })
+        .catch((error) => {
+            handleSubmitError(error)
+
+            uni.hideLoading()
+            uni.showToast({
+                title: '提交失败',
+                icon: 'none'
+            })
+        })
+        .finally(() => {
+            isSubmitting.value = false
+        })
+}
+```
+
+The important order is:
+
+```text
+request settles
+    → uni.hideLoading()
+    → uni.showToast(...)
+    → finally: release reactive/business interaction lock
+```
+
+If a branch does not show a toast, it must still explicitly close the native loading layer at the appropriate point. Do not leave `uni.showLoading()` open merely because the reactive lock is released in `finally()`.
+
+References:
+
+- uni-app prompt API: https://uniapp.dcloud.net.cn/api/ui/prompt
+- DCloud official Q&A explaining the shared underlying prompt layer: https://ask.dcloud.net.cn/question/91875
 
 ## Prevent Earlier Requests from Unlocking a Later Request
 
@@ -175,4 +273,5 @@ When the operation is visible to the user:
 - show spinner/text/progress feedback where appropriate
 - keep the current UI stable until the operation settles
 - do not allow repeated submits, destructive actions, or state changes that conflict with the pending request
-- restore controls in `finally()` even when the request fails
+- restore application-level controls in `finally()` even when the request fails
+- keep platform-native loading/toast teardown order correct instead of assuming every visual cleanup belongs in `finally()`
