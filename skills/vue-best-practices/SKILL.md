@@ -1,10 +1,12 @@
 ---
 name: vue-best-practices
-description: MUST be used for Vue.js tasks. Strongly recommends Composition API with `<script setup>` and TypeScript as the standard approach. Covers Vue 3, SSR, Volar, vue-tsc. Load for any Vue, .vue files, Vue Router, Pinia, or Vite with Vue work. ALWAYS use Composition API unless the project explicitly requires Options API.
+description: MUST be used for Vue.js tasks. Strongly recommends Vue 3 Composition API with `<script setup>` as the standard approach. Choose JavaScript or TypeScript by code stability and reuse scope: JavaScript for volatile business code, JavaScript with optional JSDoc for moderately stable shared code, and TypeScript for stable contract-heavy foundation code. Covers Vue 3, SSR, Volar, vue-tsc. Load for any Vue, .vue files, Vue Router, Pinia, or Vite with Vue work. ALWAYS use Composition API unless the project explicitly requires Options API.
 license: MIT
 metadata:
   author: github.com/vuejs-ai
-  version: "18.0.0"
+  customized_by: github.com/LingYzh
+  upstream_version: "18.0.0"
+  version: "18.1.0-personal.1"
 ---
 
 # Vue Best Practices Workflow
@@ -17,14 +19,88 @@ Use this skill as an instruction set. Follow the workflow in order unless the us
 - **Favor small, focused components:** easier to test, reuse, and maintain.
 - **Avoid unnecessary re-renders:** use computed properties and watchers wisely.
 - **Readability counts:** write clear, self-documenting code.
+- **Language follows stability:** do not default all Vue code to TypeScript; choose JS, JS + JSDoc, or TS according to expected change frequency, reuse scope, API stability, and the cost of breaking consumers.
 
 ## 1) Confirm architecture before coding (required)
 
-- Default stack: Vue 3 + Composition API + `<script setup lang="ts">`.
+- Default framework style: Vue 3 + Composition API + `<script setup>`.
+- Do **not** assume `<script setup lang="ts">` is the default.
+- Respect the existing project's local language conventions when editing existing code.
 - If the project explicitly uses Options API, load `vue-options-api-best-practices` skill if available.
 - If the project explicitly uses JSX, load `vue-jsx-best-practices` skill if available.
 
-### 1.1 Must-read core references (required)
+### 1.1 Choose the language tier before creating or substantially rewriting code (required)
+
+Classify the code by expected stability and responsibility before choosing JavaScript or TypeScript.
+
+#### Tier A — Business / volatile: default to JavaScript
+
+Use plain JavaScript for code that is expected to change frequently with product requirements:
+
+- pages and route views
+- CRUD, forms, dashboards, admin/business pages
+- feature-specific components
+- feature-specific composables
+- business orchestration / glue code
+- prototypes and rapidly evolving features
+
+Default SFC form:
+
+```vue
+<script setup>
+// business logic
+</script>
+```
+
+The primary optimization goal here is low editing friction and easy maintenance during frequent requirement changes.
+
+#### Tier B — Shared / moderately stable: default to JavaScript + optional JSDoc
+
+Use JavaScript for shared code that is reused across multiple features but still evolves regularly. Add JSDoc only at boundaries where it materially improves editor hints or clarifies a non-obvious contract.
+
+Typical examples:
+
+- shared components used by several pages
+- common but still evolving composables
+- shared utilities
+- feature-family abstractions
+
+Do not add JSDoc to every local variable or obvious function merely to imitate TypeScript syntax.
+
+#### Tier C — Foundation / stable contract: prefer TypeScript
+
+Use TypeScript when code is low-change, broadly reused, and has a stable public contract where breaking consumers is costly.
+
+Typical examples:
+
+- base / UI-library components
+- stable design-system primitives
+- library-like shared composables
+- infrastructure wrappers
+- long-lived reusable modules with important props/emits/slots or generic contracts
+
+TypeScript is valuable here because the interface is expected to stay stable enough for the type maintenance cost to pay back over many consumers.
+
+#### Language decision rules
+
+Use these signals in order:
+
+1. Existing local convention in the file/module being edited.
+2. Expected change frequency.
+3. Reuse scope and number of consumers.
+4. API/contract stability.
+5. Cost of breaking downstream consumers.
+
+Additional rules:
+
+- When uncertain for **new business code**, choose JavaScript.
+- Do **not** migrate JavaScript to TypeScript as an incidental refactor.
+- Do **not** migrate TypeScript to JavaScript incidentally either; language migration must be an explicit task or have a concrete technical reason.
+- A file becoming reusable once is not enough reason to convert it to TypeScript.
+- TypeScript availability in the project is not, by itself, a reason to use it for every new file.
+- Explicit project requirements or user instructions override this tier policy.
+
+### 1.2 Must-read core references (required)
 
 - Before implementing any Vue task, make sure to read and apply these core references:
   - `references/reactivity.md`
@@ -33,7 +109,7 @@ Use this skill as an instruction set. Follow the workflow in order unless the us
   - `references/composables.md`
 - Keep these references in active working context for the entire task, not only when a specific issue appears.
 
-### 1.2 Plan component boundaries before coding (required)
+### 1.3 Plan component boundaries before coding (required)
 
 Create a brief component map before implementation for any non-trivial feature.
 
@@ -41,23 +117,24 @@ Create a brief component map before implementation for any non-trivial feature.
 - Keep entry/root and route-level view components as composition surfaces by default.
 - Move feature UI and feature logic out of entry/root/view components unless the task is intentionally a tiny single-file demo.
 - Define props/emits contracts for each child component in the map.
-- Prefer a feature folder layout (`components/<feature>/...`, `composables/use<Feature>.ts`) when adding more than one component.
+- Prefer a feature folder layout (`components/<feature>/...`, `composables/use<Feature>.js`) for volatile business features; use `.ts` for the composable when it clearly belongs to Tier C or the existing project convention requires it.
 
 ## 2) Apply essential Vue foundations (required)
 
-These are essential, must-know foundations. Apply all of them in every Vue task using the core references already loaded in section `1.1`.
+These are essential, must-know foundations. Apply all of them in every Vue task using the core references already loaded in section `1.2`.
 
 ### Reactivity
 
-- Must-read reference from `1.1`: [reactivity](references/reactivity.md)
+- Must-read reference from `1.2`: [reactivity](references/reactivity.md)
 - Keep source state minimal (`ref`/`reactive`), derive everything possible with `computed`.
 - Use watchers for side effects if needed.
 - Avoid recomputing expensive logic in templates.
 
 ### SFC structure and template safety
 
-- Must-read reference from `1.1`: [sfc](references/sfc.md)
+- Must-read reference from `1.2`: [sfc](references/sfc.md)
 - Keep SFC sections in this order: `<script>` → `<template>` → `<style>`.
+- Apply the language tier from section `1.1` when choosing `<script setup>` vs `<script setup lang="ts">`.
 - Keep SFC responsibilities focused; split large components.
 - Keep templates declarative; move branching/derivation to script.
 - Apply Vue template safety rules (`v-html`, list rendering, conditional rendering choices).
@@ -89,17 +166,19 @@ Entry/root and route view rule:
 
 ### Component data flow
 
-- Must-read reference from `1.1`: [component-data-flow](references/component-data-flow.md)
+- Must-read reference from `1.2`: [component-data-flow](references/component-data-flow.md)
 - Use props down, events up as the primary model.
 - Use `v-model` only for true two-way component contracts.
 - Use provide/inject only for deep-tree dependencies or shared context.
-- Keep contracts explicit and typed with `defineProps`, `defineEmits`, and `InjectionKey` as needed.
+- Keep contracts explicit using runtime props/emits in JavaScript, optional JSDoc for Tier B shared code, and type-based `defineProps` / `defineEmits` / `InjectionKey` when TypeScript is appropriate for Tier C.
 
 ### Composables
 
-- Must-read reference from `1.1`: [composables](references/composables.md)
+- Must-read reference from `1.2`: [composables](references/composables.md)
 - Extract logic into composables when it is reused, stateful, or side-effect heavy.
-- Keep composable APIs small, typed, and predictable.
+- Keep composable APIs small and predictable.
+- Use JavaScript for volatile feature composables, JavaScript + optional JSDoc for moderately stable shared composables, and TypeScript for stable library-like composables.
+- Do not introduce TypeScript solely for editor hints when JSDoc or runtime contracts are sufficient.
 - Separate feature logic from presentational components.
 
 ## 3) Consider optional features only when requirements call for them
@@ -142,13 +221,15 @@ Performance work is a post-functionality pass. Do not optimize before core behav
 
 - Core behavior works and matches requirements.
 - All must-read references were read and applied.
+- The chosen JS/JSDoc/TS tier matches the code's stability and responsibility.
+- No incidental JavaScript ↔ TypeScript migration was introduced.
 - Reactivity model is minimal and predictable.
 - SFC structure and template rules are followed.
 - Components are focused and well-factored, splitting when needed.
 - Entry/root and route view components remain composition surfaces unless there is an explicit small-demo exception.
 - Component split decisions are explicit and defensible (responsibility boundaries are clear).
-- Data flow contracts are explicit and typed.
+- Data flow contracts are explicit and expressed appropriately for the selected language tier.
 - Composables are used where reuse/complexity justifies them.
-- Moved state/side effects into composables if applicable
+- Moved state/side effects into composables if applicable.
 - Optional features are used only when requirements demand them.
 - Performance changes were applied only after functionality was complete.

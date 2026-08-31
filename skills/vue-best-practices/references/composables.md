@@ -3,7 +3,7 @@ title: Composable Organization Patterns
 impact: MEDIUM
 impactDescription: Well-structured composables improve maintainability, reusability, and update performance
 type: best-practice
-tags: [vue3, composables, composition-api, code-organization, api-design, readonly, utilities]
+tags: [vue3, composables, composition-api, code-organization, api-design, readonly, utilities, javascript, jsdoc, typescript]
 ---
 
 # Composable Organization Patterns
@@ -13,10 +13,70 @@ tags: [vue3, composables, composition-api, code-organization, api-design, readon
 ## Task List
 
 - Compose complex behavior from small, focused composables
+- Choose the composable language by stability: JS for feature/volatile code, JS + optional JSDoc for moderately stable shared code, TS for stable library-like contracts
 - Use options objects for composables with multiple optional parameters
 - Return readonly state when updates must flow through explicit actions
 - Keep pure utility functions as plain utilities, not composables
 - Organize composable and component code by feature concern, and extract composables when components grow
+
+## Choose composable language by stability
+
+A composable being reusable does **not** automatically make it a TypeScript candidate. Reuse scope and contract stability matter together.
+
+### Tier A — Feature / volatile composables: JavaScript
+
+Use JavaScript for composables tightly coupled to changing product behavior:
+
+```javascript
+// composables/useOrderEditor.js
+import { ref } from 'vue'
+
+export function useOrderEditor() {
+  const draft = ref(null)
+  const saving = ref(false)
+
+  async function save() {
+    // changing business workflow
+  }
+
+  return { draft, saving, save }
+}
+```
+
+### Tier B — Shared / moderately stable composables: JavaScript + optional JSDoc
+
+Add JSDoc at meaningful public boundaries without turning every internal detail into a type declaration:
+
+```javascript
+/**
+ * @typedef {Object} UseCounterOptions
+ * @property {number} [initial]
+ * @property {number} [min]
+ * @property {number} [max]
+ * @property {number} [step]
+ */
+
+/**
+ * @param {UseCounterOptions} [options]
+ */
+export function useCounter(options = {}) {
+  const {
+    initial = 0,
+    min = -Infinity,
+    max = Infinity,
+    step = 1,
+  } = options
+
+  // implementation
+  return { initial, min, max, step }
+}
+```
+
+### Tier C — Stable library-like composables: TypeScript
+
+Prefer TypeScript when the composable is low-change, broadly reused, and exposes a mature public contract whose breakage would affect many consumers.
+
+Do not migrate a feature composable to TypeScript merely because a second caller appears. Language migration should be explicit and justified by real contract stability.
 
 ## Compose Composables from Smaller Primitives
 
@@ -125,19 +185,7 @@ useFetch('/api/users', {
 })
 ```
 
-```typescript
-interface UseCounterOptions {
-  initial?: number
-  min?: number
-  max?: number
-  step?: number
-}
-
-export function useCounter(options: UseCounterOptions = {}) {
-  const { initial = 0, min = -Infinity, max = Infinity, step = 1 } = options
-  // implementation
-}
-```
+For a Tier B shared composable, add JSDoc to this pattern only when the option shape is complex enough to benefit from editor help. For Tier C, a TypeScript interface is appropriate once the options contract is stable.
 
 ## Return Readonly State with Explicit Actions
 

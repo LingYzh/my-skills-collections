@@ -12,7 +12,7 @@
 
 | Skill | 用途 | Local | Upstream | 同步状态 | 本地状态 |
 | --- | --- | --- | --- | --- | --- |
-| [`vue-best-practices`](./skills/vue-best-practices/) | Vue 3 / Composition API / TypeScript 开发最佳实践 | **v18.0.0** | **v18.0.0** | 🟢 **Exact snapshot** | 上游基线已导入，尚未开始个人定制 |
+| [`vue-best-practices`](./skills/vue-best-practices/) | Vue 3 / Composition API 开发最佳实践 | **v18.1.0-personal.1** | **v18.0.0** | 🔵 **Customized** | 已开始个人定制：按稳定性选择 JS / JSDoc / TS |
 
 ## Skill Details
 
@@ -23,17 +23,26 @@ Vue 3 开发工作流与最佳实践 Skill，覆盖响应式、SFC、组件数�
 - **Local path:** [`skills/vue-best-practices/`](./skills/vue-best-practices/)
 - **Upstream:** [`vuejs-ai/skills`](https://github.com/vuejs-ai/skills/tree/main/skills/vue-best-practices)
 - **Upstream branch:** `main`
-- **Local version:** `18.0.0`
-- **Upstream version:** `18.0.0`
-- **Sync state:** Exact upstream snapshot
-- **Local customization:** None yet
+- **Local version:** `18.1.0-personal.1`
+- **Based on upstream version:** `18.0.0`
+- **Sync state:** Customized
 - **License:** MIT
-- **Upstream repository HEAD when checked:** `c9d355ff23f654309dd02006be671859df0a134c`
-- **SKILL.md blob:** `feacd704fc48310744f8f8791e318343ea8ab1cb`
-- **references/ tree:** `d3f4b86fa1ad5a259e3a58dc6ed1fc0958ac7dd0`
+- **Upstream repository HEAD when baseline was checked:** `c9d355ff23f654309dd02006be671859df0a134c`
+- **Upstream baseline SKILL.md blob:** `feacd704fc48310744f8f8791e318343ea8ab1cb`
+- **Upstream baseline references/ tree:** `d3f4b86fa1ad5a259e3a58dc6ed1fc0958ac7dd0`
 - **Imported into this repository:** 2026-08-31
+- **Customization started:** 2026-08-31
 
-The current local copy is byte-identical to the checked upstream Skill snapshot. Future personal changes will intentionally move this Skill into a customized state rather than pretending to remain synchronized.
+#### Current customizations
+
+1. **Stability-driven JavaScript / TypeScript policy**
+   - **Business / volatile:** default to JavaScript for pages, route views, CRUD/forms/dashboards, feature-specific components and feature-specific composables.
+   - **Shared / moderately stable:** default to JavaScript with optional JSDoc at meaningful public boundaries.
+   - **Foundation / stable contract:** prefer TypeScript for low-change, broadly reused, contract-heavy components/composables/infrastructure.
+   - Never migrate JavaScript ↔ TypeScript as an incidental refactor; migration must be explicit or technically justified.
+   - Existing local project conventions take priority when modifying existing files.
+
+This Skill is now intentionally different from upstream. Upstream version/commit/tree information above is retained as the baseline for future comparison and selective rebasing.
 
 ## Status Legend
 
@@ -49,13 +58,14 @@ The current local copy is byte-identical to the checked upstream Skill snapshot.
 
 为了避免“版本号相同但内容已经不同”的情况，本仓库尽量同时记录：
 
-1. Skill 自身的版本号；
-2. 上游仓库与分支；
-3. 上游快照的 commit / tree / blob 信息；
-4. 当前本地是否存在定制修改；
-5. 最近一次状态检查日期。
+1. Skill 自身的本地版本号；
+2. 它所基于的上游版本；
+3. 上游仓库与分支；
+4. 上游基线的 commit / tree / blob 信息；
+5. 当前本地定制内容；
+6. 最近一次状态检查日期。
 
-一旦 Skill 开始进行个人定制，README 中的状态会从 **Exact snapshot** 改为 **Customized**，并继续记录它所基于的上游版本，方便后续判断是否需要吸收新的 upstream changes。
+对已经进入 **Customized** 状态的 Skill，不会直接用新的 upstream 内容覆盖本地修改。更新上游时应先比较差异，再选择性吸收适合当前个人工作流的变化。
 
 ## Repository Layout
 

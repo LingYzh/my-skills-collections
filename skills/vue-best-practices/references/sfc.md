@@ -1,19 +1,20 @@
 ---
 title: Single-File Component Structure, Styling, and Template Patterns
 impact: MEDIUM
-impactDescription: Consistent SFC structure and styling choices improve maintainability, tooling support, and render performance
+impactDescription: Consistent SFC structure, language selection, and styling choices improve maintainability, tooling support, and render performance
 type: best-practice
-tags: [vue3, sfc, scoped-css, styles, build-tools, performance, template, v-html, v-for, computed, v-if, v-show]
+tags: [vue3, sfc, javascript, typescript, jsdoc, scoped-css, styles, build-tools, performance, template, v-html, v-for, computed, v-if, v-show]
 ---
 
 # Single-File Component Structure, Styling, and Template Patterns
 
-**Impact: MEDIUM** - Using SFCs with consistent structure and performant styling keeps components easier to maintain and avoids unnecessary render overhead.
+**Impact: MEDIUM** - Using SFCs with consistent structure, an appropriate script language, and performant styling keeps components easier to maintain and avoids unnecessary render overhead.
 
 ## Task List
 
 - Use `.vue` SFCs instead of separate `.js`/`.ts` and `.css` files for components
 - Colocate template, script, and styles in the same SFC by default
+- Choose JS / JS + JSDoc / TS according to change frequency and contract stability; do not default every SFC to TypeScript
 - Use PascalCase for component names in templates and filenames
 - Prefer component-scoped styles
 - Prefer class selectors (not element selectors) in scoped CSS for performance
@@ -22,6 +23,56 @@ tags: [vue3, sfc, scoped-css, styles, build-tools, performance, template, v-html
 - Use `v-for` and `v-if` correctly
 - Never use `v-html` with untrusted/user-provided content
 - Choose `v-if` vs `v-show` based on toggle frequency and initial render cost
+
+## Choose the script language by stability
+
+Do not treat TypeScript as the universal default for Vue SFCs. Choose the script language according to the component's expected lifetime and rate of change.
+
+| Tier | Default | Typical components |
+| --- | --- | --- |
+| Business / volatile | JavaScript | pages, route views, forms, CRUD, dashboards, feature-specific components |
+| Shared / moderately stable | JavaScript + optional JSDoc | common components, shared feature-family components, evolving cross-page abstractions |
+| Foundation / stable contract | TypeScript | base UI, design-system primitives, stable reusable library components |
+
+For volatile business code, prefer:
+
+```vue
+<script setup>
+// frequently changing business logic
+</script>
+```
+
+For moderately stable shared JavaScript, add JSDoc only when a boundary benefits from it:
+
+```vue
+<script setup>
+/**
+ * @typedef {{ id: string, label: string }} Option
+ */
+
+const props = defineProps({
+  options: {
+    type: Array,
+    required: true,
+  },
+})
+</script>
+```
+
+For a stable foundation component with a mature public contract, TypeScript is appropriate:
+
+```vue
+<script setup lang="ts">
+interface Props {
+  modelValue: string | number | null
+  disabled?: boolean
+}
+
+defineProps<Props>()
+</script>
+```
+
+Do not convert an existing JavaScript SFC to TypeScript as a side effect of an unrelated change. Likewise, do not remove TypeScript from an existing TypeScript component without an explicit reason.
 
 ## Colocate template, script, and styles
 
@@ -158,13 +209,13 @@ p { line-height: 1.6; }
 
 ## Access DOM / component refs with `useTemplateRef()`
 
-For Vue 3.5+: use `useTemplateRef()` to access template refs.
+For Vue 3.5+: use `useTemplateRef()` to access template refs. Do not enable TypeScript solely for this API.
 
 ```vue
-<script setup lang="ts">
+<script setup>
 import { onMounted, useTemplateRef } from 'vue'
 
-const inputRef = useTemplateRef<HTMLInputElement>('input')
+const inputRef = useTemplateRef('input')
 
 onMounted(() => {
   inputRef.value?.focus()
@@ -174,6 +225,12 @@ onMounted(() => {
 <template>
   <input ref="input" />
 </template>
+```
+
+In a Tier C TypeScript component, add the element type when it improves the stable public/internal contract:
+
+```ts
+const inputRef = useTemplateRef<HTMLInputElement>('input')
 ```
 
 ## Use camelCase in `:style` bindings
@@ -228,7 +285,7 @@ It leads to unclear intent and unnecessary work.
 **GOOD:**
 
 ```vue
-<script setup lang="ts">
+<script setup>
 import { computed } from 'vue'
 
 const activeUsers = computed(() => users.value.filter(u => u.active))
@@ -268,10 +325,13 @@ const activeUsers = computed(() => users.value.filter(u => u.active))
 import { computed } from 'vue'
 import DOMPurify from 'dompurify'
 
-const props = defineProps<{
-  trustedHtml?: string
-  plainText: string
-}>()
+const props = defineProps({
+  trustedHtml: String,
+  plainText: {
+    type: String,
+    required: true,
+  },
+})
 
 const safeHtml = computed(() => DOMPurify.sanitize(props.trustedHtml ?? ''))
 </script>

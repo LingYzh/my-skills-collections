@@ -3,7 +3,7 @@ title: Component Data Flow Best Practices
 impact: HIGH
 impactDescription: Clear data flow between components prevents state bugs, stale UI, and brittle coupling
 type: best-practice
-tags: [vue3, props, emits, v-model, provide-inject, data-flow, typescript]
+tags: [vue3, props, emits, v-model, provide-inject, data-flow, javascript, jsdoc, typescript]
 ---
 
 # Component Data Flow Best Practices
@@ -16,13 +16,13 @@ The main principle of data flow in Vue.js is **Props Down / Events Up**. This is
 
 - Treat props as read-only inputs
 - Use props/emit for component communication; reserve refs for imperative actions
-- When refs are required for imperative APIs, type them with template refs
+- Keep imperative component refs explicit and null-safe; add static types when the selected language tier uses TypeScript
 - Emit events instead of mutating parent state directly
 - Use `defineModel` for v-model in modern Vue (3.4+)
 - Handle v-model modifiers deliberately in child components
 - Use symbols for provide/inject keys to avoid props drilling (over ~3 layers)
 - Keep mutations in the provider or expose explicit actions
-- In TypeScript projects, prefer type-based `defineProps`, `defineEmits`, and `InjectionKey`
+- Express public contracts according to the language tier: runtime declarations in JavaScript, optional JSDoc for moderately stable shared JavaScript, and type-based `defineProps`, `defineEmits`, and `InjectionKey` in stable TypeScript code
 
 ## Props: One-Way Data Down
 
@@ -81,32 +81,14 @@ function handleSubmit(formData) {
 </template>
 ```
 
-## Type component refs when imperative access is required
+## Keep imperative component refs explicit
 
-Prefer props/emits by default. When a parent must call an exposed child method, type the ref explicitly and expose only the intended API from the child with `defineExpose`.
+Prefer props/emits by default. When a parent must call an exposed child method, expose only the intended API with `defineExpose` and keep access null-safe.
 
-**BAD:**
-```vue
-<script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import DialogPanel from './DialogPanel.vue'
-
-const panelRef = ref(null)
-
-onMounted(() => {
-  panelRef.value.open()
-})
-</script>
-
-<template>
-  <DialogPanel ref="panelRef" />
-</template>
-```
-
-**GOOD:**
+**GOOD — JavaScript business/shared component:**
 ```vue
 <!-- DialogPanel.vue -->
-<script setup lang="ts">
+<script setup>
 function open() {}
 
 defineExpose({ open })
@@ -115,15 +97,11 @@ defineExpose({ open })
 
 ```vue
 <!-- Parent.vue -->
-<script setup lang="ts">
+<script setup>
 import { onMounted, useTemplateRef } from 'vue'
 import DialogPanel from './DialogPanel.vue'
 
-// Vue 3.5+ with useTemplateRef
 const panelRef = useTemplateRef('panelRef')
-
-// Before Vue 3.5 with manual typing and ref
-// const panelRef = ref<InstanceType<typeof DialogPanel> | null>(null)
 
 onMounted(() => {
   panelRef.value?.open()
@@ -134,6 +112,23 @@ onMounted(() => {
   <DialogPanel ref="panelRef" />
 </template>
 ```
+
+For a stable TypeScript foundation component, type the same ref when the type materially protects a long-lived contract:
+
+```vue
+<script setup lang="ts">
+import { onMounted, useTemplateRef } from 'vue'
+import DialogPanel from './DialogPanel.vue'
+
+const panelRef = useTemplateRef<InstanceType<typeof DialogPanel>>('panelRef')
+
+onMounted(() => {
+  panelRef.value?.open()
+})
+</script>
+```
+
+Do not convert a JavaScript component to TypeScript solely because it needs one template ref.
 
 ## Emits: Explicit Events Up
 
@@ -245,36 +240,55 @@ const { toggleTheme } = inject(themeActionsKey)
 ```
 
 Use symbols for keys to avoid collisions in large apps:
-```ts
+```js
 export const themeKey = Symbol('theme')
 export const themeActionsKey = Symbol('theme-actions')
 ```
 
-## Use TypeScript Contracts for Public Component APIs
+## Express public contracts according to stability
 
-In TypeScript projects, type component boundaries directly with `defineProps`, `defineEmits`, and `InjectionKey` so invalid payloads and mismatched injections fail at compile time.
+The important rule is that public component boundaries are **explicit**. They do not all need to be expressed with TypeScript.
 
-**BAD:**
+### Tier A — Business / volatile JavaScript
+
+Prefer runtime Vue declarations that are quick to edit with changing requirements:
+
 ```vue
-<script setup lang="ts">
-import { inject } from 'vue'
-
+<script setup>
 const props = defineProps({
-  userId: String
+  userId: {
+    type: String,
+    required: true,
+  },
+  editable: {
+    type: Boolean,
+    default: false,
+  },
 })
 
-const emit = defineEmits(['save'])
-const settings = inject('settings')
-
-// Payload shape is not checked here
-emit('save', 123)
-
-// Key is string-based and not type-safe
-settings?.theme = 'dark'
+const emit = defineEmits(['save', 'cancel'])
 </script>
 ```
 
-**GOOD:**
+### Tier B — Shared / moderately stable JavaScript
+
+Keep runtime declarations and add JSDoc only for non-obvious payloads or shared contracts:
+
+```js
+/**
+ * @typedef {{ id: string, draft: boolean }} SavePayload
+ */
+
+/** @param {SavePayload} payload */
+function save(payload) {
+  emit('save', payload)
+}
+```
+
+### Tier C — Foundation / stable TypeScript
+
+For stable, broadly reused components, type component boundaries directly with `defineProps`, `defineEmits`, and `InjectionKey` so invalid payloads and mismatched injections fail at compile time.
+
 ```vue
 <script setup lang="ts">
 import { inject, provide } from 'vue'
@@ -305,3 +319,5 @@ if (settings) {
 }
 </script>
 ```
+
+Do not treat a type-based contract as inherently more maintainable when the business contract itself is still changing rapidly.
