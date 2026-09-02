@@ -26,7 +26,41 @@ codex plugin marketplace add LingYzh/my-skills-collections --ref master
 codex plugin add lingyzh-skills@lingyzh-skills
 ```
 
-插件安装后会提供当前收录的全部 Skills。Codex 分发副本位于 `plugins/lingyzh-skills/skills/`，但根目录 `skills/` 始终是唯一源码来源。
+插件安装后会提供当前收录的全部 Skills。
+
+### Claude Code Plugin Marketplace
+
+本仓库同时提供 Claude Code 原生 marketplace manifest：`.claude-plugin/marketplace.json`。
+
+添加市场：
+
+```bash
+claude plugin marketplace add LingYzh/my-skills-collections@master
+```
+
+安装合集插件：
+
+```bash
+claude plugin install lingyzh-skills@lingyzh-skills
+```
+
+也可以在 Claude Code 交互界面中使用：
+
+```text
+/plugin marketplace add LingYzh/my-skills-collections
+/plugin install lingyzh-skills@lingyzh-skills
+```
+
+Claude Code 安装后的 Skill 会使用插件 namespace，例如：
+
+```text
+/lingyzh-skills:grilling
+/lingyzh-skills:vue-best-practices
+```
+
+### Shared Distribution Bundle
+
+Codex 和 Claude Code 共用 `plugins/lingyzh-skills/skills/` 这一份生成 bundle；根目录 `skills/` 始终是唯一源码来源。
 
 更新根目录 Skill 后运行：
 
@@ -40,7 +74,7 @@ python scripts/sync-codex-plugin.py
 python scripts/sync-codex-plugin.py --check
 ```
 
-CI 会在 `master` 的 push 和 pull request 上验证 Codex bundle 没有与根 `skills/` 漂移。
+虽然脚本名称保留为 `sync-codex-plugin.py`，它现在维护的是 Codex 与 Claude Code 共用的 plugin skill bundle。CI 会在 `master` 的 push 和 pull request 上验证该 bundle 没有与根 `skills/` 漂移。
 
 ## Skills
 
@@ -176,13 +210,15 @@ This Skill is intentionally different from upstream. Upstream version/commit/tre
     - execution preflight asks only questions that block or substantially change the current task
     - low-impact hypothetical edges and decisions implied by prior policies do not deserve separate questions
 
-## Codex Distribution
+## Distribution
 
-Codex marketplace metadata is kept separate from Skill source files:
+Codex 与 Claude Code 的 marketplace metadata 分开维护，但共用同一份 plugin skill bundle：
 
-- `.agents/plugins/marketplace.json` — repository marketplace manifest
+- `.agents/plugins/marketplace.json` — Codex repository marketplace manifest
+- `.claude-plugin/marketplace.json` — Claude Code marketplace manifest
 - `plugins/lingyzh-skills/.codex-plugin/plugin.json` — Codex plugin manifest
-- `plugins/lingyzh-skills/skills/` — generated mirror of root `skills/`
+- `plugins/lingyzh-skills/.claude-plugin/plugin.json` — Claude Code plugin manifest
+- `plugins/lingyzh-skills/skills/` — generated mirror of root `skills/`，由两种插件格式共用
 - `scripts/sync-codex-plugin.py` — sync/check helper
 - `.github/workflows/check-codex-plugin-sync.yml` — drift guard
 
@@ -218,14 +254,18 @@ my-skills-collections/
 ├── .agents/
 │   └── plugins/
 │       └── marketplace.json
+├── .claude-plugin/
+│   └── marketplace.json
 ├── .github/
 │   └── workflows/
 │       └── check-codex-plugin-sync.yml
 ├── plugins/
 │   └── lingyzh-skills/
+│       ├── .claude-plugin/
+│       │   └── plugin.json
 │       ├── .codex-plugin/
 │       │   └── plugin.json
-│       └── skills/                  # generated mirror
+│       └── skills/                  # generated shared mirror
 ├── scripts/
 │   └── sync-codex-plugin.py
 ├── skills/                          # source of truth
@@ -240,7 +280,7 @@ my-skills-collections/
 └── README.md
 ```
 
-后续新增 Skill 时统一放入 `skills/<skill-name>/`，并在本 README 的 Skills 表格中登记来源、版本和同步状态；随后运行同步脚本更新 Codex plugin bundle。
+后续新增 Skill 时统一放入 `skills/<skill-name>/`，并在本 README 的 Skills 表格中登记来源、版本和同步状态；随后运行同步脚本更新 Codex / Claude Code 共用 plugin bundle。
 
 ## Sources & Licenses
 

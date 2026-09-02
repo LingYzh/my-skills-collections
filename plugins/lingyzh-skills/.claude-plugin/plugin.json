@@ -1,0 +1,20 @@
+{
+    "name": "lingyzh-skills",
+    "displayName": "LingYzh Skills",
+    "version": "0.1.0",
+    "description": "LingYzh's personal collection of customized Agent Skills for development and agent workflows.",
+    "author": {
+        "name": "LingYzh",
+        "url": "https://github.com/LingYzh"
+    },
+    "homepage": "https://github.com/LingYzh/my-skills-collections",
+    "repository": "https://github.com/LingYzh/my-skills-collections",
+    "license": "MIT",
+    "keywords": [
+        "agent-skills",
+        "claude-code",
+        "vue",
+        "grilling"
+    ],
+    "skills": "./skills/"
+}
