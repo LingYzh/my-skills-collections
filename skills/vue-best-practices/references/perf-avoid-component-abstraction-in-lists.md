@@ -1,159 +1,106 @@
 ---
-title: Avoid Excessive Component Abstraction in Large Lists
+title: Avoid Excessive Component Abstraction in Hot List Paths
 impact: MEDIUM
-impactDescription: Each component instance has memory and render overhead - abstractions multiply this in lists
+impactDescription: Component instances add overhead in frequently rendered list paths, but optimization should be measurement-driven
 type: efficiency
-tags: [vue3, performance, components, abstraction, lists, optimization]
+tags: [vue3, performance, components, abstraction, lists, optimization, profiling]
 ---
 
-# Avoid Excessive Component Abstraction in Large Lists
+# Avoid Excessive Component Abstraction in Hot List Paths
 
-**Impact: MEDIUM** - Component instances are more expensive than plain DOM nodes. While abstractions improve code organization, unnecessary nesting creates overhead. In large lists, this overhead multiplies - 100 items with 3 levels of abstraction means 300+ component instances instead of 100.
-
-Don't avoid abstraction entirely, but be mindful of component depth in frequently-rendered elements like list items.
+Component abstraction has a runtime cost, but that cost only matters when it is significant in the actual rendering path. Do not flatten a maintainable component tree based on arbitrary list-size or component-count thresholds.
 
 ## Task List
 
-- Review list item components for unnecessary wrapper components
-- Consider flattening component hierarchies in hot paths
-- Use native elements when a component adds no value
-- Profile component counts using Vue DevTools
-- Focus optimization efforts on the most-rendered components
+- Optimize only when the list/path is large or hot enough to matter
+- Use profiling and realistic data before flattening abstractions
+- Remove wrapper components that add no behavior, contract, reuse, accessibility, or styling value
+- Preserve useful component boundaries even inside lists when their benefit exceeds measured overhead
+- Do not use fixed thresholds such as “under 20 items is safe” or “three wrappers cost 3x memory”
+- Do not introduce a third-party performance package merely because this reference discusses list performance
 
-**BAD:**
-```vue
-<!-- BAD: Deep abstraction in list items -->
-<template>
-  <div class="user-list">
-    <!-- For 100 users: Creates 400 component instances -->
-    <UserCard v-for="user in users" :key="user.id" :user="user" />
-  </div>
-</template>
+## What Counts as Unnecessary Abstraction
 
-<!-- UserCard.vue -->
-<template>
-  <Card>  <!-- Wrapper component #1 -->
-    <CardHeader>  <!-- Wrapper component #2 -->
-      <UserAvatar :src="user.avatar" />  <!-- Wrapper component #3 -->
-    </CardHeader>
-    <CardBody>  <!-- Wrapper component #4 -->
-      <Text>{{ user.name }}</Text>
-    </CardBody>
-  </Card>
-</template>
+A wrapper is a candidate for removal when it exists only to add another component layer and does not provide a meaningful boundary.
 
-<!-- Each UserCard creates: Card + CardHeader + CardBody + UserAvatar + Text
-     100 users = 500+ component instances -->
-```
-
-**GOOD:**
-```vue
-<!-- GOOD: Flattened structure in list items -->
-<template>
-  <div class="user-list">
-    <!-- For 100 users: Creates 100 component instances -->
-    <UserCard v-for="user in users" :key="user.id" :user="user" />
-  </div>
-</template>
-
-<!-- UserCard.vue - Flattened, uses native elements -->
-<template>
-  <div class="card">
-    <div class="card-header">
-      <img :src="user.avatar" :alt="user.name" class="avatar" />
-    </div>
-    <div class="card-body">
-      <span class="user-name">{{ user.name }}</span>
-    </div>
-  </div>
-</template>
-
-<script setup>
-defineProps({
-  user: Object
-})
-</script>
-
-<style scoped>
-/* Styles that would have been in Card, CardHeader, etc. */
-.card { /* ... */ }
-.card-header { /* ... */ }
-.card-body { /* ... */ }
-.avatar { /* ... */ }
-</style>
-```
-
-## When Abstraction Is Still Worth It
+**Potentially excessive:**
 
 ```vue
-<!-- Component abstraction is valuable when: -->
-
-<!-- 1. Complex behavior is encapsulated -->
-<UserStatusIndicator :user="user" />  <!-- Has logic, tooltips, etc. -->
-
-<!-- 2. Reused outside of the hot path -->
-<Card>  <!-- OK to use in one-off places, not in 100-item lists -->
-
-<!-- 3. The list itself is small -->
-<template v-if="items.length < 20">
-  <FancyItem v-for="item in items" :key="item.id" />
+<template>
+    <UserRow
+        v-for="user in users"
+        :key="user.id"
+        :user="user"
+    />
 </template>
-
-<!-- 4. Virtualization is used (only ~20 items rendered at once) -->
-<RecycleScroller :items="items">
-  <template #default="{ item }">
-    <ComplexItem :item="item" />  <!-- OK - only 20 instances exist -->
-  </template>
-</RecycleScroller>
 ```
-
-## Measuring Component Overhead
-
-```javascript
-// In development, profile component counts
-import { onMounted, getCurrentInstance } from 'vue'
-
-onMounted(() => {
-  const instance = getCurrentInstance()
-  let count = 0
-
-  function countComponents(vnode) {
-    if (vnode.component) count++
-    if (vnode.children) {
-      vnode.children.forEach(child => {
-        if (child.component || child.children) countComponents(child)
-      })
-    }
-  }
-
-  // Use Vue DevTools instead for accurate counts
-  console.log('Check Vue DevTools Components tab for instance counts')
-})
-```
-
-## Alternatives to Wrapper Components
 
 ```vue
-<!-- Instead of a <Button> component for styling: -->
-<button class="btn btn-primary">Click</button>
-
-<!-- Instead of a <Text> component: -->
-<span class="text-body">{{ content }}</span>
-
-<!-- Instead of layout wrapper components in lists: -->
-<div class="flex items-center gap-2">
-  <!-- content -->
-</div>
-
-<!-- Use CSS classes or Tailwind instead of component abstractions for styling -->
+<!-- UserRow.vue -->
+<template>
+    <RowFrame>
+        <RowBody>
+            <RowText>{{ user.name }}</RowText>
+        </RowBody>
+    </RowFrame>
+</template>
 ```
 
-## Impact Calculation
+If `RowFrame`, `RowBody`, and `RowText` are styling-only wrappers with no reusable contract, accessibility behavior, or project convention behind them, flattening may help a measured hot path.
 
-| List Size | Components per Item | Total Instances | Memory Impact |
-|-----------|---------------------|-----------------|---------------|
-| 100 items | 1 (flat) | 100 | Baseline |
-| 100 items | 3 (nested) | 300 | ~3x memory |
-| 100 items | 5 (deeply nested) | 500 | ~5x memory |
-| 1000 items | 1 (flat) | 1000 | High |
-| 1000 items | 5 (deeply nested) | 5000 | Very High |
+```vue
+<template>
+    <article class="user-row">
+        <span class="user-row__name">
+            {{ user.name }}
+        </span>
+    </article>
+</template>
+```
+
+## When Abstraction Is Still Valuable
+
+Keep a component boundary when it provides meaningful value such as:
+
+- reusable behavior
+- accessibility semantics
+- an intentional public contract
+- complex state/lifecycle isolation
+- a stable design-system primitive already used throughout the project
+- independent testing/debugging value
+- a feature boundary that makes volatile business code easier to maintain
+
+Do not flatten stable shared components just because they appear in a list.
+
+## Profile Before Rewriting
+
+Use the profiling/debugging tools already available in the project/browser/runtime to answer concrete questions:
+
+- Is initial render slow?
+- Are list updates slow?
+- Is component creation a meaningful part of the profile?
+- Is memory pressure actually coming from component instances?
+- Is the problem instead data processing, images, layout, network work, or an oversized DOM/tree?
+
+Optimize the measured bottleneck rather than component count in isolation.
+
+## Virtualization Changes the Cost Model
+
+If the project already virtualizes a large list, only a subset of items may exist at once. In that case, a richer item component can be completely acceptable.
+
+If virtualization does not exist and the rendered tree is genuinely too large, load `perf-virtualize-large-lists.md` for conceptual guidance. That reference must not be interpreted as permission to install a package automatically.
+
+## Avoid Fake Precision
+
+Do not use fixed numbers from documentation examples as universal cutoffs. List cost varies with:
+
+- item template complexity
+- nested component behavior
+- reactive dependencies
+- image/media content
+- target device
+- browser/runtime
+- update frequency
+- whether offscreen items are mounted
+
+A threshold is valid only when it comes from the project's own product/performance requirements or measured behavior.

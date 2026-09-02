@@ -1,97 +1,106 @@
 ---
 title: Component Data Flow Best Practices
 impact: HIGH
-impactDescription: Clear data flow between components prevents state bugs, stale UI, and brittle coupling
+impactDescription: Explicit ownership and communication boundaries prevent hidden coupling without forcing unnecessary abstraction
 type: best-practice
 tags: [vue3, props, emits, v-model, provide-inject, data-flow, javascript, jsdoc, typescript]
 ---
 
 # Component Data Flow Best Practices
 
-**Impact: HIGH** - Vue components stay reliable when data flow is explicit: props go down, events go up, `v-model` handles two-way bindings, and provide/inject supports cross-tree dependencies. Blurring these boundaries leads to stale state, hidden coupling, and hard-to-debug UI.
-
-The main principle of data flow in Vue.js is **Props Down / Events Up**. This is the most maintainable default, and one-way flow scales well.
+Use the simplest communication mechanism that keeps state ownership obvious. Props down / events up is the normal default, not a rule that forbids every other Vue mechanism.
 
 ## Task List
 
 - Treat props as read-only inputs
-- Use props/emit for component communication; reserve refs for imperative actions
-- Keep imperative component refs explicit and null-safe; add static types when the selected language tier uses TypeScript
-- Emit events instead of mutating parent state directly
-- Use `defineModel` for v-model in modern Vue (3.4+)
-- Handle v-model modifiers deliberately in child components
-- Use symbols for provide/inject keys to avoid props drilling (over ~3 layers)
-- Keep mutations in the provider or expose explicit actions
-- Express public contracts according to the language tier: runtime declarations in JavaScript, optional JSDoc for moderately stable shared JavaScript, and type-based `defineProps`, `defineEmits`, and `InjectionKey` in stable TypeScript code
+- Use props/events for ordinary parent-child communication
+- Use `v-model` for intentional two-way component contracts
+- Use component refs only for genuinely imperative APIs
+- Use provide/inject for contextual dependencies that would otherwise be mechanically forwarded through unrelated intermediates
+- Keep shared mutations owned by the provider or exposed through explicit actions when useful
+- Express contracts according to the selected JS / JSDoc / TS stability tier
+- Do not migrate component architecture as part of an unrelated edit
 
-## Props: One-Way Data Down
-
-Props are inputs. Do not mutate them in the child.
+## Props Are Read-Only Inputs
 
 **BAD:**
+
 ```vue
 <script setup>
-const props = defineProps({ count: Number })
+const props = defineProps({
+    count: Number
+})
 
 function increment() {
-  props.count++
+    props.count += 1
 }
 </script>
 ```
 
-**GOOD:**
+Prefer an event, an intentional `v-model` contract, or a local derived/copy value depending on ownership.
 
-If state needs to change, emit an event, use `v-model` or create a local copy.
+## Prefer Props and Events for Ordinary Parent-Child Flow
 
-## Prefer props/emit over component refs
-
-**BAD:**
 ```vue
+<!-- Child.vue -->
 <script setup>
-import { ref } from 'vue'
-import UserForm from './UserForm.vue'
+const emit = defineEmits(['save'])
 
-const formRef = ref(null)
+function save(formData) {
+    emit('save', formData)
+}
+</script>
+```
 
-function submitForm() {
-  if (formRef.value.isValid) {
-    formRef.value.submit()
-  }
+```vue
+<!-- Parent.vue -->
+<script setup>
+function handleSave(formData) {
+    submitForm(formData)
 }
 </script>
 
 <template>
-  <UserForm ref="formRef" />
-  <button @click="submitForm">Submit</button>
+    <Child @save="handleSave" />
 </template>
 ```
 
-**GOOD:**
+Component events do not automatically bubble through arbitrary ancestor levels. Re-emit only when that component is intentionally part of the event contract; do not build long chains of pass-through events when the data actually belongs to a broader context.
+
+## Use `v-model` for Real Two-Way Contracts
+
+On modern Vue versions, `defineModel()` is appropriate when the child represents an editable value owned by the parent.
+
 ```vue
 <script setup>
-import UserForm from './UserForm.vue'
-
-function handleSubmit(formData) {
-  api.submit(formData)
-}
+const model = defineModel({
+    type: String
+})
 </script>
 
 <template>
-  <UserForm @submit="handleSubmit" />
+    <input v-model="model" />
 </template>
 ```
 
-## Keep imperative component refs explicit
+Do not introduce `v-model` merely to avoid writing one explicit event when the relationship is not conceptually two-way.
 
-Prefer props/emits by default. When a parent must call an exposed child method, expose only the intended API with `defineExpose` and keep access null-safe.
+For older Vue versions, follow the project's existing `modelValue` / `update:modelValue` convention rather than rewriting unrelated components.
 
-**GOOD — JavaScript business/shared component:**
+## Keep Imperative Component Refs Narrow
+
+Use a component ref when the parent genuinely needs to call an imperative child API such as focus, open, close, reset, or scroll.
+
 ```vue
 <!-- DialogPanel.vue -->
 <script setup>
-function open() {}
+function open() {
+    // ...
+}
 
-defineExpose({ open })
+defineExpose({
+    open
+})
 </script>
 ```
 
@@ -99,225 +108,131 @@ defineExpose({ open })
 <!-- Parent.vue -->
 <script setup>
 import { onMounted, useTemplateRef } from 'vue'
-import DialogPanel from './DialogPanel.vue'
 
 const panelRef = useTemplateRef('panelRef')
 
 onMounted(() => {
-  panelRef.value?.open()
+    panelRef.value?.open()
 })
 </script>
 
 <template>
-  <DialogPanel ref="panelRef" />
+    <DialogPanel ref="panelRef" />
 </template>
 ```
 
-For a stable TypeScript foundation component, type the same ref when the type materially protects a long-lived contract:
+Expose only the intended imperative surface. Do not convert a JavaScript component to TypeScript solely because one template ref exists.
 
-```vue
-<script setup lang="ts">
-import { onMounted, useTemplateRef } from 'vue'
-import DialogPanel from './DialogPanel.vue'
+### Platform gate for element refs
 
-const panelRef = useTemplateRef<InstanceType<typeof DialogPanel>>('panelRef')
+Browser DOM assumptions do not automatically apply to uni-app targets. In non-H5 uni-app builds, template refs can have different capabilities and may not expose native/built-in elements like browser DOM nodes. Load `uni-app-platform.md` before writing DOM-oriented ref logic for uni-app.
 
-onMounted(() => {
-  panelRef.value?.open()
+## Use Provide/Inject for Context, Not a Layer Count
+
+Do **not** use a magic threshold such as “more than three component layers”. The real signal is whether intermediate components are being forced to forward data/actions they do not otherwise care about.
+
+Good provide/inject candidates include:
+
+- form or field-group context
+- theme/config context
+- feature-level services/actions used by descendants
+- parent-controlled compound component context
+
+Avoid provide/inject when a direct prop/event relationship is already clear and local.
+
+```js
+import { inject, provide, readonly } from 'vue'
+
+const themeKey = Symbol('theme')
+const themeActionsKey = Symbol('theme-actions')
+
+const theme = reactive({
+    dark: false
 })
-</script>
-```
 
-Do not convert a JavaScript component to TypeScript solely because it needs one template ref.
-
-## Emits: Explicit Events Up
-
-Component events do not bubble. If a parent needs to know about an event, re-emit it explicitly.
-
-**BAD:**
-```vue
-<!-- Parent expects "saved" from grandchild, but it won't bubble -->
-<Child @saved="onSaved" />
-```
-
-**GOOD:**
-```vue
-<!-- Child.vue -->
-<script setup>
-const emit = defineEmits(['saved'])
-
-function onGrandchildSaved(payload) {
-  emit('saved', payload)
+function toggleTheme() {
+    theme.dark = !theme.dark
 }
-</script>
-
-<template>
-  <Grandchild @saved="onGrandchildSaved" />
-</template>
-```
-
-**Event naming:** use kebab-case in templates and camelCase in script:
-```vue
-<script setup>
-const emit = defineEmits(['updateUser'])
-</script>
-
-<template>
-  <ProfileForm @update-user="emit('updateUser', $event)" />
-</template>
-```
-
-## `v-model`: Predictable Two-Way Bindings
-
-Use `defineModel` by default for component bindings and emit updates on input. Only use the `modelValue` + `update:modelValue` pattern if you are on Vue < 3.4.
-
-**BAD:**
-```vue
-<script setup>
-const props = defineProps({ value: String })
-</script>
-
-<template>
-  <input :value="props.value" @input="$emit('input', $event.target.value)" />
-</template>
-```
-
-**GOOD (Vue 3.4+):**
-```vue
-<script setup>
-const model = defineModel({ type: String })
-</script>
-
-<template>
-  <input v-model="model" />
-</template>
-```
-
-**GOOD (Vue < 3.4):**
-```vue
-<script setup>
-const props = defineProps({ modelValue: String })
-const emit = defineEmits(['update:modelValue'])
-</script>
-
-<template>
-  <input
-    :value="props.modelValue"
-    @input="emit('update:modelValue', $event.target.value)"
-  />
-</template>
-```
-
-If you need the updated value immediately after a change, use the input event value or `nextTick` in the parent.
-
-## Provide/Inject: Shared Context Without Prop Drilling
-
-Use provide/inject for cross-tree state, but keep mutations centralized in the provider and expose explicit actions.
-
-**BAD:**
-```vue
-// Provider.vue
-provide('theme', reactive({ dark: false }))
-
-// Consumer.vue
-const theme = inject('theme')
-// Mutating shared state from any depth becomes hard to track
-theme.dark = true
-```
-
-**GOOD:**
-```vue
-// Provider.vue
-const theme = reactive({ dark: false })
-const toggleTheme = () => { theme.dark = !theme.dark }
 
 provide(themeKey, readonly(theme))
-provide(themeActionsKey, { toggleTheme })
-
-// Consumer.vue
-const theme = inject(themeKey)
-const { toggleTheme } = inject(themeActionsKey)
+provide(themeActionsKey, {
+    toggleTheme
+})
 ```
 
-Use symbols for keys to avoid collisions in large apps:
-```js
-export const themeKey = Symbol('theme')
-export const themeActionsKey = Symbol('theme-actions')
-```
+Use symbol keys when collision resistance or library-like isolation is useful. For very small local contexts, do not add ceremony that makes the code harder to follow.
 
-## Express public contracts according to stability
-
-The important rule is that public component boundaries are **explicit**. They do not all need to be expressed with TypeScript.
+## Express Public Contracts According to Stability
 
 ### Tier A — Business / volatile JavaScript
 
-Prefer runtime Vue declarations that are quick to edit with changing requirements:
+Use runtime declarations that are quick to update with changing requirements.
 
 ```vue
 <script setup>
 const props = defineProps({
-  userId: {
-    type: String,
-    required: true,
-  },
-  editable: {
-    type: Boolean,
-    default: false,
-  },
+    userId: {
+        type: String,
+        required: true
+    },
+    editable: {
+        type: Boolean,
+        default: false
+    }
 })
 
-const emit = defineEmits(['save', 'cancel'])
+const emit = defineEmits([
+    'save',
+    'cancel'
+])
 </script>
 ```
 
 ### Tier B — Shared / moderately stable JavaScript
 
-Keep runtime declarations and add JSDoc only for non-obvious payloads or shared contracts:
+Keep runtime declarations and add JSDoc only where a non-obvious shared contract benefits from it.
 
 ```js
 /**
  * @typedef {{ id: string, draft: boolean }} SavePayload
  */
 
-/** @param {SavePayload} payload */
+/**
+ * @param {SavePayload} payload
+ */
 function save(payload) {
-  emit('save', payload)
+    emit('save', payload)
 }
 ```
 
 ### Tier C — Foundation / stable TypeScript
 
-For stable, broadly reused components, type component boundaries directly with `defineProps`, `defineEmits`, and `InjectionKey` so invalid payloads and mismatched injections fail at compile time.
+Use type-based component contracts when the component is low-change, broadly reused, and contract breakage would affect many consumers.
 
 ```vue
 <script setup lang="ts">
-import { inject, provide } from 'vue'
-import type { InjectionKey } from 'vue'
-
 interface Props {
-  userId: string
+    userId: string
+    editable?: boolean
 }
 
 interface Emits {
-  save: [payload: { id: string; draft: boolean }]
+    save: [payload: { id: string, draft: boolean }]
+    cancel: []
 }
-
-interface Settings {
-  theme: 'light' | 'dark'
-}
-
-const settingsKey: InjectionKey<Settings> = Symbol('settings')
 
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
-
-provide(settingsKey, { theme: 'light' })
-
-const settings = inject(settingsKey)
-if (settings) {
-  emit('save', { id: props.userId, draft: false })
-}
 </script>
 ```
 
-Do not treat a type-based contract as inherently more maintainable when the business contract itself is still changing rapidly.
+Do not treat a typed contract as inherently more maintainable when the business contract itself is still changing quickly.
+
+## Respect Existing Architecture During Maintenance
+
+When editing existing code:
+
+- keep the existing props/events/model/provide pattern if it is working and the task does not require architectural change
+- do not replace refs with events, or events with provide/inject, solely because this reference describes another option
+- do not migrate Options API to Composition API as an incidental refactor
+- make architecture migration an explicit task with a concrete benefit

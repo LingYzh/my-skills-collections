@@ -1,216 +1,110 @@
 ---
-title: Component Slots Best Practices
+title: Component Slot Guidance
 impact: MEDIUM
-impactDescription: Poor slot API design causes empty DOM wrappers, weak TypeScript safety, brittle defaults, and unnecessary component overhead
+impactDescription: Slots are useful public composition contracts, but unnecessary slot APIs can make simple components harder to maintain
 type: best-practice
-tags: [vue3, slots, components, typescript, composables]
+tags: [vue3, slots, components, javascript, typescript]
 ---
 
-# Component Slots Best Practices
+# Component Slot Guidance
 
-**Impact: MEDIUM** - Slots are a core component API surface in Vue. Structure them intentionally so templates stay predictable, typed, and performant.
+Use slots when the parent genuinely needs to control child content/layout while the child still owns the surrounding structure or behavior.
 
 ## Task List
 
-- Use shorthand syntax for named slots (`#` instead of `v-slot:`)
-- Render optional slot wrapper elements only when slot content exists (`$slots` checks)
-- Type scoped slot contracts with `defineSlots` in TypeScript components
-- Provide fallback content for optional slots
-- Prefer composables over renderless components for pure logic reuse
+- Prefer the `#name` shorthand for named slots
+- Give optional slots sensible fallback content when appropriate
+- Render optional wrappers conditionally when an empty wrapper would affect layout/semantics
+- Type slot props only in Tier C TypeScript components where the stable public contract benefits from it
+- Do not convert a simple prop-based component to slots without a real customization need
+- Do not replace a renderless component with a composable automatically; choose the abstraction that best matches UI vs logic composition
 
-## Shorthand syntax for named slots
+## Named Slots
 
-**BAD:**
 ```vue
-<MyComponent>
-  <template v-slot:header> ... </template>
-</MyComponent>
+<PanelCard>
+    <template #header>
+        <h2>Profile</h2>
+    </template>
+
+    <p>Main content</p>
+</PanelCard>
 ```
 
-**GOOD:**
+## Optional Wrappers
+
+If the wrapper itself adds layout, spacing, or semantics, avoid rendering it when the slot is absent.
+
 ```vue
-<MyComponent>
-  <template #header> ... </template>
-</MyComponent>
-```
-
-## Conditionally Render Optional Slot Wrappers
-
-Use `$slots` checks when wrapper elements add spacing, borders, or layout constraints.
-
-**BAD:**
-```vue
-<!-- Card.vue -->
 <template>
-  <article class="card">
-    <header class="card-header">
-      <slot name="header" />
-    </header>
+    <article class="card">
+        <header
+            v-if="$slots.header"
+            class="card__header"
+        >
+            <slot name="header" />
+        </header>
 
-    <section class="card-body">
-      <slot />
-    </section>
+        <section class="card__body">
+            <slot />
+        </section>
 
-    <footer class="card-footer">
-      <slot name="footer" />
-    </footer>
-  </article>
+        <footer
+            v-if="$slots.footer"
+            class="card__footer"
+        >
+            <slot name="footer" />
+        </footer>
+    </article>
 </template>
 ```
 
-**GOOD:**
+Do not add `$slots` checks when an empty wrapper is harmless and the check only adds noise.
+
+## Fallback Content
+
 ```vue
-<!-- Card.vue -->
 <template>
-  <article class="card">
-    <header v-if="$slots.header" class="card-header">
-      <slot name="header" />
-    </header>
-
-    <section v-if="$slots.default" class="card-body">
-      <slot />
-    </section>
-
-    <footer v-if="$slots.footer" class="card-footer">
-      <slot name="footer" />
-    </footer>
-  </article>
+    <button type="submit">
+        <slot>Submit</slot>
+    </button>
 </template>
 ```
 
-## Type Scoped Slot Props with defineSlots
+Fallback content is useful when the component has a clear default. Do not invent fallback UI that hides a missing required contract.
 
-In `<script setup lang="ts">`, use `defineSlots` so slot consumers get autocomplete and static checks.
+## Scoped Slots
 
-**BAD:**
+Use scoped slots when the child owns data/behavior but the parent needs to control rendering.
+
 ```vue
-<!-- ProductList.vue -->
-<script setup lang="ts">
-interface Product {
-  id: number
-  name: string
-}
-
-defineProps<{ products: Product[] }>()
-</script>
-
 <template>
-  <ul>
-    <li v-for="(product, index) in products" :key="product.id">
-      <slot :product="product" :index="index" />
-    </li>
-  </ul>
+    <ul>
+        <li
+            v-for="(item, index) in items"
+            :key="item.id"
+        >
+            <slot
+                :item="item"
+                :index="index"
+            />
+        </li>
+    </ul>
 </template>
 ```
 
-**GOOD:**
-```vue
-<!-- ProductList.vue -->
-<script setup lang="ts">
-interface Product {
-  id: number
-  name: string
-}
+For Tier A/B JavaScript components, runtime behavior is sufficient unless a shared contract needs JSDoc.
 
-defineProps<{ products: Product[] }>()
+For a stable Tier C TypeScript foundation component, `defineSlots()` may be used to type the slot contract. Do not enable TypeScript solely because scoped slots exist.
 
-defineSlots<{
-  default(props: { product: Product; index: number }): any
-  empty(): any
-}>()
-</script>
+## Slots vs Props vs Composables
 
-<template>
-  <ul v-if="products.length">
-    <li v-for="(product, index) in products" :key="product.id">
-      <slot :product="product" :index="index" />
-    </li>
-  </ul>
-  <slot v-else name="empty" />
-</template>
-```
+Choose based on responsibility:
 
-## Provide Slot Fallback Content
+- prop -> parent supplies a value/configuration
+- slot -> parent supplies UI/content
+- event -> child reports an action/change
+- composable -> reusable stateful/behavior logic without owning rendered structure
+- renderless component -> can still be valid when slot-driven UI composition is itself the intended API
 
-Fallback content makes components resilient when parents omit optional slots.
-
-**BAD:**
-```vue
-<!-- SubmitButton.vue -->
-<template>
-  <button type="submit" class="btn-primary">
-    <slot />
-  </button>
-</template>
-```
-
-**GOOD:**
-```vue
-<!-- SubmitButton.vue -->
-<template>
-  <button type="submit" class="btn-primary">
-    <slot>Submit</slot>
-  </button>
-</template>
-```
-
-## Prefer Composables for Pure Logic Reuse
-
-Renderless components are still useful for slot-driven composition, but composables are usually cleaner for logic-only reuse.
-
-**BAD:**
-```vue
-<!-- MouseTracker.vue -->
-<script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
-
-const x = ref(0)
-const y = ref(0)
-
-function onMove(event: MouseEvent) {
-  x.value = event.pageX
-  y.value = event.pageY
-}
-
-onMounted(() => window.addEventListener('mousemove', onMove))
-onUnmounted(() => window.removeEventListener('mousemove', onMove))
-</script>
-
-<template>
-  <slot :x="x" :y="y" />
-</template>
-```
-
-**GOOD:**
-```ts
-// composables/useMouse.ts
-import { ref, onMounted, onUnmounted } from 'vue'
-
-export function useMouse() {
-  const x = ref(0)
-  const y = ref(0)
-
-  function onMove(event: MouseEvent) {
-    x.value = event.pageX
-    y.value = event.pageY
-  }
-
-  onMounted(() => window.addEventListener('mousemove', onMove))
-  onUnmounted(() => window.removeEventListener('mousemove', onMove))
-
-  return { x, y }
-}
-```
-
-```vue
-<!-- MousePosition.vue -->
-<script setup lang="ts">
-import { useMouse } from '@/composables/useMouse'
-
-const { x, y } = useMouse()
-</script>
-
-<template>
-  <p>{{ x }}, {{ y }}</p>
-</template>
-```
+Do not force one mechanism to replace another based only on style preference.

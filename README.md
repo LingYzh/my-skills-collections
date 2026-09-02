@@ -6,24 +6,24 @@
 
 > 本仓库不是各上游项目的官方镜像。若本地 Skill 已进行定制，其行为可能与上游版本不同。
 
-**Last status check:** 2026-08-31
+**Last status check:** 2026-09-02
 
 ## Skills
 
 | Skill | 用途 | Local | Upstream | 同步状态 | 本地状态 |
 | --- | --- | --- | --- | --- | --- |
-| [`vue-best-practices`](./skills/vue-best-practices/) | Vue 3 / Composition API 开发最佳实践 | **v18.3.0-personal.3** | **v18.0.0** | 🔵 **Customized** | ✅ **Active** |
+| [`vue-best-practices`](./skills/vue-best-practices/) | Vue 3 / Composition API / uni-app Vue 开发实践 | **v18.4.0-personal.4** | **v18.0.0** | 🔵 **Customized** | ✅ **Active** |
 
 ## Skill Details
 
 ### vue-best-practices
 
-Vue 3 开发工作流与最佳实践 Skill，覆盖响应式、SFC、组件数据流、Composables、状态管理、异步接口交互、异步组件、动画及性能优化等主题。
+Vue 3 开发工作流与最佳实践 Skill。当前个人版本重点关注业务代码可维护性、按任务加载规则、跨平台兼容、异步 UI 行为和依赖纪律。
 
 - **Local path:** [`skills/vue-best-practices/`](./skills/vue-best-practices/)
 - **Upstream:** [`vuejs-ai/skills`](https://github.com/vuejs-ai/skills/tree/main/skills/vue-best-practices)
 - **Upstream branch:** `main`
-- **Local version:** `18.3.0-personal.3`
+- **Local version:** `18.4.0-personal.4`
 - **Based on upstream version:** `18.0.0`
 - **Sync state:** Customized
 - **License:** MIT
@@ -32,27 +32,48 @@ Vue 3 开发工作流与最佳实践 Skill，覆盖响应式、SFC、组件数�
 - **Upstream baseline references/ tree:** `d3f4b86fa1ad5a259e3a58dc6ed1fc0958ac7dd0`
 - **Imported into this repository:** 2026-08-31
 - **Customization started:** 2026-08-31
+- **Last local review:** 2026-09-02
 
 #### Current customizations
 
-1. **Stability-driven JavaScript / TypeScript policy**
-    - **Business / volatile:** default to JavaScript for pages, route views, CRUD/forms/dashboards, feature-specific components and feature-specific composables.
-    - **Shared / moderately stable:** default to JavaScript with optional JSDoc at meaningful public boundaries.
-    - **Foundation / stable contract:** prefer TypeScript for low-change, broadly reused, contract-heavy components/composables/infrastructure.
-    - Never migrate JavaScript ↔ TypeScript as an incidental refactor; migration must be explicit or technically justified.
-    - Existing local project conventions take priority when modifying existing files.
+1. **Stability-driven JS / JSDoc / TS tiers**
+    - volatile business code defaults to JavaScript
+    - moderately stable shared code defaults to JavaScript with optional JSDoc
+    - stable contract-heavy foundation code may prefer TypeScript
+    - language/architecture migration is never an incidental refactor
 
-2. **Four-space indentation**
-    - All authored or edited hand-maintained code uses four ASCII spaces per indentation level.
-    - Editing a legacy 2-space or mixed-indentation file also normalizes the entire edited file to four spaces.
-    - Editable formatter/linter/editor settings are aligned to four spaces so tooling does not revert source indentation.
+2. **Mandatory four-space formatting**
+    - all edited hand-maintained source/config files use four ASCII spaces
+    - legacy 2-space/mixed files are normalized when edited
+    - existing project formatting tools are aligned when necessary so they do not revert edited source
 
-3. **Async API/interface interaction policy**
-    - Prefer Promise chaining (`then/catch/finally`) for API/interface calls.
-    - UI-triggered requests use loading/disabled interaction locks.
-    - In uni-app, `uni.hideLoading()` must run before a following `uni.showToast()`; `finally()` is reserved for releasing the application-level reactive/business lock in that flow.
+3. **Async UI interaction policy**
+    - Promise chaining is preferred for ordinary API/interface request flow
+    - conflicting UI actions are locked while requests are pending
+    - uni-app native loading is hidden before a following toast; application-level locks remain a `finally()` cleanup concern
 
-This Skill is now intentionally different from upstream. Upstream version/commit/tree information above is retained as the baseline for future comparison and selective rebasing.
+4. **Task-scoped reference loading and relaxed abstraction**
+    - references are loaded only when relevant instead of preloading four large core files for every task
+    - component/composable extraction requires a real responsibility, reuse, lifecycle, or maintenance boundary
+    - no fixed CRUD component recipe, UI-section count, component-depth threshold, or list-size threshold
+
+5. **uni-app platform gate**
+    - H5/Web, App, and mini-program targets are treated as different runtimes
+    - DOM, routing, refs, Teleport, Transition, KeepAlive, Suspense, and other platform-sensitive guidance must pass compatibility checks first
+
+6. **Dependency-neutral generic Skill**
+    - examples do not recommend installing runtime third-party libraries
+    - existing project dependencies may be maintained, but this generic Skill does not promote them
+    - new dependencies require an explicit architectural reason
+    - third-party-specific practices belong in separate Skills or project documentation
+
+7. **Upstream rule cleanup**
+    - primitive state defaults to normal `ref()`; `shallowRef()` is reserved for intentionally shallow/opaque/large root-replacement state
+    - Suspense is treated as experimental
+    - performance advice is profiling/evidence-driven instead of based on fake-precise thresholds
+    - all references have been reviewed and examples normalized to the personal conventions
+
+This Skill is intentionally different from upstream. Upstream version/commit/tree information above is retained as the baseline for future comparison and selective rebasing.
 
 ## Status Legend
 
@@ -86,7 +107,9 @@ my-skills-collections/
     └── vue-best-practices/
         ├── SKILL.md
         └── references/
-            └── async-interface-ui.md
+            ├── async-interface-ui.md
+            ├── uni-app-platform.md
+            └── ...
 ```
 
 后续新增 Skill 时统一放入 `skills/<skill-name>/`，并在本 README 的 Skills 表格中登记来源、版本和同步状态。

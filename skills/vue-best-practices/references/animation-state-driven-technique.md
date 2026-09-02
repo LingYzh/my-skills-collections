@@ -1,291 +1,105 @@
 ---
-title: State-driven Animations with CSS Transitions and Style Bindings
+title: State-driven Animation Guidance
 impact: LOW
-impactDescription: Combining Vue's reactive style bindings with CSS transitions creates smooth, interactive animations
+impactDescription: Reactive style/class bindings can drive simple interactive motion without introducing animation dependencies
 type: best-practice
-tags: [vue3, animation, css, transition, style-binding, state, interactive]
+tags: [vue3, animation, css, style-binding, state, interactive, platform]
 ---
 
-# State-driven Animations with CSS Transitions and Style Bindings
+# State-driven Animation Guidance
 
-**Impact: LOW** - For responsive, interactive animations that react to user input or state changes, combine Vue's dynamic style bindings with CSS transitions. This creates smooth animations that interpolate values in real-time based on state.
+Use reactive style/class bindings when visual state directly follows Vue state. Keep the animation mechanism as simple as the requirement allows.
 
 ## Task List
 
-- Use `:style` binding for dynamic properties that change frequently
-- Add CSS `transition` property to smoothly animate between values
-- Consider using `transform` and `opacity` for GPU-accelerated animations
-- For complex value interpolation, use watchers with animation libraries
+- Bind only the dynamic values that truly come from state
+- Reuse project motion durations/easing/tokens
+- Prefer transform/opacity when they satisfy the visual requirement
+- Avoid high-frequency reactive writes when CSS/native behavior can handle the interaction
+- Do not add an animation/tween library from this reference
+- Treat mouse/scroll/DOM examples as H5/browser-specific
+- Apply `uni-app-platform.md` before using browser event geometry in uni-app
 
-## Basic Pattern
+## Basic State-driven Style
 
 ```vue
-<template>
-  <div
-    @mousemove="onMousemove"
-    :style="{ backgroundColor: `hsl(${hue}, 80%, 50%)` }"
-    class="interactive-area"
-  >
-    <p>Move your mouse across this div...</p>
-    <p>Hue: {{ hue }}</p>
-  </div>
-</template>
-
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
-const hue = ref(0)
+const progress = ref(0)
 
-function onMousemove(e) {
-  // Map mouse X position to hue (0-360)
-  const rect = e.currentTarget.getBoundingClientRect()
-  hue.value = Math.round((e.clientX - rect.left) / rect.width * 360)
-}
+const progressStyle = computed(() => {
+    return {
+        transform: `scaleX(${progress.value / 100})`
+    }
+})
 </script>
 
-<style>
-.interactive-area {
-  transition: background-color 0.3s ease;
-  height: 200px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+<template>
+    <div class="progress-track">
+        <div
+            class="progress-bar"
+            :style="progressStyle"
+        />
+    </div>
+</template>
+
+<style scoped>
+.progress-bar {
+    transform-origin: left center;
+    transition: transform var(--motion-duration) var(--motion-easing);
 }
 </style>
 ```
 
-## Common Use Cases
+The variables represent existing project conventions, not packages/tokens that this Skill requires you to add.
 
-### Following Mouse Position
+## Browser-only Pointer Example
 
 ```vue
-<template>
-  <div
-    class="container"
-    @mousemove="onMousemove"
-  >
-    <div
-      class="follower"
-      :style="{
-        transform: `translate(${x}px, ${y}px)`
-      }"
-    />
-  </div>
-</template>
-
 <script setup>
 import { ref } from 'vue'
 
 const x = ref(0)
 const y = ref(0)
 
-function onMousemove(e) {
-  const rect = e.currentTarget.getBoundingClientRect()
-  x.value = e.clientX - rect.left
-  y.value = e.clientY - rect.top
+function handlePointerMove(event) {
+    const rect = event.currentTarget.getBoundingClientRect()
+
+    x.value = event.clientX - rect.left
+    y.value = event.clientY - rect.top
 }
 </script>
 
-<style>
-.container {
-  position: relative;
-  height: 300px;
-}
-
-.follower {
-  position: absolute;
-  width: 20px;
-  height: 20px;
-  background: blue;
-  border-radius: 50%;
-  /* Smooth following with transition */
-  transition: transform 0.1s ease-out;
-  /* Prevent the follower from triggering mousemove */
-  pointer-events: none;
-}
-</style>
-```
-
-### Progress Animation
-
-```vue
 <template>
-  <div class="progress-container">
     <div
-      class="progress-bar"
-      :style="{ width: `${progress}%` }"
-    />
-  </div>
-  <input
-    type="range"
-    v-model.number="progress"
-    min="0"
-    max="100"
-  />
+        class="interactive-area"
+        @pointermove="handlePointerMove"
+    >
+        <div
+            class="follower"
+            :style="{
+                transform: `translate(${x}px, ${y}px)`
+            }"
+        />
+    </div>
 </template>
-
-<script setup>
-import { ref } from 'vue'
-
-const progress = ref(0)
-</script>
-
-<style>
-.progress-container {
-  height: 20px;
-  background: #e0e0e0;
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.progress-bar {
-  height: 100%;
-  background: linear-gradient(90deg, #4CAF50, #8BC34A);
-  transition: width 0.3s ease;
-}
-</style>
 ```
 
-### Scroll-based Animation
+This relies on browser DOM geometry and pointer events. Do not copy it into uni-app App/mini-program code without a target-specific implementation.
 
-```vue
-<template>
-  <div
-    class="hero"
-    :style="{
-      opacity: heroOpacity,
-      transform: `translateY(${scrollOffset}px)`
-    }"
-  >
-    <h1>Scroll Down</h1>
-  </div>
-</template>
+## Avoid Framework-side Tweening by Default
 
-<script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+Do not reach for a watcher plus an animation library merely to interpolate a number. First consider:
 
-const scrollY = ref(0)
+- CSS transition/animation
+- native/platform animation capability already used by the project
+- an existing project animation abstraction
 
-const heroOpacity = computed(() => {
-  return Math.max(0, 1 - scrollY.value / 300)
-})
+If a specialized animation engine is genuinely required, that dependency choice belongs to the project architecture or a dedicated Skill, not this generic Vue reference.
 
-const scrollOffset = computed(() => {
-  return scrollY.value * 0.5  // Parallax effect
-})
+## High-frequency Input
 
-function handleScroll() {
-  scrollY.value = window.scrollY
-}
+For scroll/pointer/drag-driven effects, avoid assuming every event should update Vue reactive state at full frequency. Use the project's established performance pattern and profile the actual target.
 
-onMounted(() => {
-  window.addEventListener('scroll', handleScroll, { passive: true })
-})
-
-onUnmounted(() => {
-  window.removeEventListener('scroll', handleScroll)
-})
-</script>
-
-<style>
-.hero {
-  height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* Note: No transition for scroll-based animations - they should be instant */
-}
-</style>
-```
-
-### Color Theme Transition
-
-```vue
-<template>
-  <div
-    class="app"
-    :style="themeStyles"
-  >
-    <button @click="toggleTheme">Toggle Theme</button>
-    <p>Current theme: {{ isDark ? 'Dark' : 'Light' }}</p>
-  </div>
-</template>
-
-<script setup>
-import { ref, computed } from 'vue'
-
-const isDark = ref(false)
-
-const themeStyles = computed(() => ({
-  '--bg-color': isDark.value ? '#1a1a1a' : '#ffffff',
-  '--text-color': isDark.value ? '#ffffff' : '#1a1a1a',
-  backgroundColor: 'var(--bg-color)',
-  color: 'var(--text-color)'
-}))
-
-function toggleTheme() {
-  isDark.value = !isDark.value
-}
-</script>
-
-<style>
-.app {
-  min-height: 100vh;
-  transition: background-color 0.5s ease, color 0.5s ease;
-}
-</style>
-```
-
-## Advanced: Numerical Tweening with Watchers
-
-For smooth number animations (counters, stats), use watchers with animation libraries:
-
-```vue
-<template>
-  <div>
-    <input v-model.number="targetNumber" type="number" />
-    <p class="counter">{{ displayNumber.toFixed(0) }}</p>
-  </div>
-</template>
-
-<script setup>
-import { computed, ref, reactive, watch } from 'vue'
-import gsap from 'gsap'
-
-const targetNumber = ref(0)
-const tweened = reactive({ value: 0 })
-
-// Computed for display
-const displayNumber = computed(() => tweened.value)
-
-watch(targetNumber, (newValue) => {
-  gsap.to(tweened, {
-    duration: 0.5,
-    value: Number(newValue) || 0,
-    ease: 'power2.out'
-  })
-})
-</script>
-```
-
-## Performance Considerations
-
-```vue
-<style>
-/* GOOD: GPU-accelerated properties */
-.element {
-  transition: transform 0.3s ease, opacity 0.3s ease;
-}
-
-/* AVOID: Properties that trigger layout recalculation */
-.element {
-  transition: width 0.3s ease, height 0.3s ease, margin 0.3s ease;
-}
-
-/* For high-frequency updates, consider will-change */
-.frequently-animated {
-  will-change: transform;
-}
-</style>
-```
+Browser APIs such as `window.scrollY`, `requestAnimationFrame`, and direct DOM geometry are platform-specific and require the uni-app gate outside H5.

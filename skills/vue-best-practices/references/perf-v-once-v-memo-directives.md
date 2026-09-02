@@ -1,182 +1,74 @@
 ---
-title: Use v-once and v-memo to Skip Unnecessary Updates
+title: v-once and v-memo Performance Guidance
 impact: MEDIUM
-impactDescription: v-once skips all future updates for static content; v-memo conditionally memoizes subtrees
+impactDescription: Manual template memoization can skip updates, but incorrect use can freeze UI and should be justified by a real hot path
 type: efficiency
-tags: [vue3, performance, v-once, v-memo, optimization, directives]
+tags: [vue3, performance, v-once, v-memo, optimization, profiling]
 ---
 
-# Use v-once and v-memo to Skip Unnecessary Updates
+# v-once and v-memo Performance Guidance
 
-**Impact: MEDIUM** - Vue re-evaluates templates on every reactive change. For content that never changes or changes infrequently, `v-once` and `v-memo` tell Vue to skip updates, reducing render work.
-
-Use `v-once` for truly static content and `v-memo` for conditionally-static content in lists.
+Use `v-once` / `v-memo` only when a real rendering hot path benefits from skipping updates. Vue's normal renderer should remain the default.
 
 ## Task List
 
-- Apply `v-once` to elements that use runtime data but never need updating
-- Apply `v-memo` to list items that should only update on specific condition changes
-- Verify memoized content doesn't need to respond to other state changes
-- Profile with Vue DevTools to confirm update skipping
+- Apply `v-once` only to content that truly must never update after initial render
+- Apply `v-memo` only when the memo dependency list fully describes when the subtree must update
+- Verify child/component interaction is not accidentally frozen
+- Profile before and after when this is a performance optimization
+- Do not add memoization to trivial templates without evidence
+- Do not rely on fake “1000 items -> 2 updates” performance tables as universal behavior
 
-## v-once: Render Once, Never Update
+## `v-once`
 
-**BAD:**
 ```vue
 <template>
-  <!-- BAD: Re-evaluated on every parent re-render -->
-  <div class="terms-content">
-    <h1>Terms of Service</h1>
-    <p>Version: {{ termsVersion }}</p>
-    <div v-html="termsContent"></div>
-  </div>
-
-  <!-- This content NEVER changes, but Vue checks it every render -->
-  <footer>
-    <p>Copyright {{ copyrightYear }} {{ companyName }}</p>
-  </footer>
+    <section v-once>
+        <h2>{{ immutableHeading }}</h2>
+        <p>{{ immutableDescription }}</p>
+    </section>
 </template>
 ```
 
-**GOOD:**
+Use this only when those values are intentionally fixed for the component instance. If they can change, `v-once` is incorrect.
+
+## `v-memo`
+
 ```vue
 <template>
-  <!-- GOOD: Rendered once, skipped on all future updates -->
-  <div class="terms-content" v-once>
-    <h1>Terms of Service</h1>
-    <p>Version: {{ termsVersion }}</p>
-    <div v-html="termsContent"></div>
-  </div>
-
-  <!-- v-once tells Vue this never needs to update -->
-  <footer v-once>
-    <p>Copyright {{ copyrightYear }} {{ companyName }}</p>
-  </footer>
-</template>
-
-<script setup>
-// These values are set once at component creation
-const termsVersion = '2.1'
-const termsContent = fetchedTermsHTML
-const copyrightYear = 2024
-const companyName = 'Acme Corp'
-</script>
-```
-
-## v-memo: Conditional Memoization for Lists
-
-**BAD:**
-```vue
-<template>
-  <!-- BAD: All items re-render when selectedId changes -->
-  <div v-for="item in list" :key="item.id">
-    <div :class="{ selected: item.id === selectedId }">
-      <ExpensiveComponent :data="item" />
+    <div
+        v-for="item in items"
+        :key="item.id"
+        v-memo="[
+            item.id === selectedId,
+            item.id === editingId
+        ]"
+    >
+        <ItemCard
+            :item="item"
+            :selected="item.id === selectedId"
+            :editing="item.id === editingId"
+        />
     </div>
-  </div>
 </template>
 ```
 
-**GOOD:**
-```vue
-<template>
-  <!-- GOOD: Items only re-render when their selection state changes -->
-  <div
-    v-for="item in list"
-    :key="item.id"
-    v-memo="[item.id === selectedId]"
-  >
-    <div :class="{ selected: item.id === selectedId }">
-      <ExpensiveComponent :data="item" />
-    </div>
-  </div>
-</template>
+This is valid only if no other value affecting the subtree needs to trigger an update. Missing a dependency can create stale UI.
 
-<script setup>
-import { ref } from 'vue'
+## Do Not Memoize Interactive State Blindly
 
-const list = ref([/* many items */])
-const selectedId = ref(null)
+Be cautious around:
 
-// When selectedId changes:
-// - Only the previously-selected item re-renders (selected: true -> false)
-// - Only the newly-selected item re-renders (selected: false -> true)
-// - All other items are SKIPPED (v-memo values unchanged)
-</script>
-```
+- form controls / `v-model`
+- child components with independent reactive state
+- slots whose visible output depends on changing parent state
+- accessibility state
+- frequently changing data not represented in the memo array
 
-## v-memo with Multiple Dependencies
+Correctness is more important than skipped updates.
 
-```vue
-<template>
-  <!-- Re-render only when item's selection OR editing state changes -->
-  <div
-    v-for="item in items"
-    :key="item.id"
-    v-memo="[item.id === selectedId, item.id === editingId]"
-  >
-    <ItemCard
-      :item="item"
-      :selected="item.id === selectedId"
-      :editing="item.id === editingId"
-    />
-  </div>
-</template>
+## Performance Rule
 
-<script setup>
-const selectedId = ref(null)
-const editingId = ref(null)
-const items = ref([/* ... */])
-</script>
-```
+Do not add `v-once` / `v-memo` as a routine cleanup. Use them after identifying a meaningful render-update cost or when the content's immutability is an explicit design property.
 
-## v-memo with Empty Array = v-once
-
-```vue
-<template>
-  <!-- v-memo="[]" is equivalent to v-once -->
-  <div v-for="item in staticList" :key="item.id" v-memo="[]">
-    {{ item.name }}
-  </div>
-</template>
-```
-
-## When NOT to Use These Directives
-
-```vue
-<template>
-  <!-- DON'T: Content that DOES need to update -->
-  <div v-once>
-    <span>Count: {{ count }}</span>  <!-- count won't update! -->
-  </div>
-
-  <!-- DON'T: When child components have their own reactive state -->
-  <div v-memo="[selected]">
-    <InputField v-model="item.name" />  <!-- v-model won't work properly -->
-  </div>
-
-  <!-- DON'T: When the memoization benefit is minimal -->
-  <span v-once>{{ simpleText }}</span>  <!-- Overhead not worth it -->
-</template>
-```
-
-## Performance Comparison
-
-| Scenario | Without Directive | With v-once/v-memo |
-|----------|-------------------|-------------------|
-| Static header, parent re-renders 100x | Re-evaluated 100x | Evaluated 1x |
-| 1000 items, selection changes | 1000 items re-render | 2 items re-render |
-| Complex child component | Full re-render | Skipped if memoized |
-
-## Debugging Memoized Components
-
-```vue
-<script setup>
-import { onUpdated } from 'vue'
-
-// This won't fire if v-memo prevents update
-onUpdated(() => {
-  console.log('Component updated')
-})
-</script>
-```
+If a list is genuinely large, also check whether the real issue is mounted-tree size (`perf-virtualize-large-lists.md`) or component overhead (`perf-avoid-component-abstraction-in-lists.md`) rather than memoization.

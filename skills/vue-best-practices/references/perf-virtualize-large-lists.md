@@ -1,187 +1,97 @@
 ---
-title: Virtualize Large Lists to Avoid DOM Overload
+title: Virtualize Large Lists When Rendering Cost Requires It
 impact: HIGH
-impactDescription: Rendering thousands of list items creates excessive DOM nodes, causing slow renders and high memory usage
+impactDescription: Large mounted trees can create render and memory pressure, but virtualization should be justified by measured cost and project constraints
 type: efficiency
-tags: [vue3, performance, virtual-list, large-data, dom, optimization]
+tags: [vue3, performance, virtual-list, large-data, optimization, profiling, dependency-discipline]
 ---
 
-# Virtualize Large Lists to Avoid DOM Overload
+# Virtualize Large Lists When Rendering Cost Requires It
 
-**Impact: HIGH** - Rendering all items in a large list (hundreds or thousands) creates massive amounts of DOM nodes. Each node consumes memory, slows down initial render, and makes updates expensive. List virtualization only renders visible items, dramatically improving performance.
-
-Use a virtualization library when dealing with lists that could exceed 50-100 items, especially if items have complex content.
+Virtualization renders only the visible or near-visible portion of a large collection. It can be very effective when the mounted render tree is the actual bottleneck, but it is not a default requirement for every moderately sized list.
 
 ## Task List
 
-- Identify lists that render more than 50-100 items
-- Install a virtualization library (vue-virtual-scroller, @tanstack/vue-virtual)
-- Replace standard `v-for` with virtualized component
-- Ensure list items have consistent or estimable heights
-- Test with realistic data volumes during development
+- Test with realistic data volumes and target devices
+- Confirm the mounted list/tree is a meaningful performance bottleneck
+- Reuse an existing project virtualization solution when available
+- Do not install a virtualization dependency solely because this reference exists
+- Account for dynamic item height, keyboard navigation, accessibility, scroll restoration, and testability
+- Keep a non-virtualized implementation when it already meets product performance requirements
 
-## Recommended Libraries
+## Identify the Real Problem First
 
-| Library | Best For | Notes |
-|---------|----------|-------|
-| `vue-virtual-scroller` | General use, easy setup | Most popular, good defaults |
-| `@tanstack/vue-virtual` | Complex layouts, headless | Framework-agnostic, flexible |
-| `vue-virtual-scroll-grid` | Grid layouts | 2D virtualization |
-| `vueuc/VVirtualList` | Naive UI projects | Part of Naive UI ecosystem |
+A long data array does not automatically mean the UI needs virtualization. Measure the rendered result.
 
-**BAD:**
-```vue
-<template>
-  <!-- BAD: Renders ALL 10,000 items immediately -->
-  <div class="user-list">
-    <UserCard
-      v-for="user in users"
-      :key="user.id"
-      :user="user"
-    />
-  </div>
-</template>
+Possible bottlenecks include:
 
-<script setup>
-import { ref, onMounted } from 'vue'
-import UserCard from './UserCard.vue'
+- too many mounted DOM/native nodes
+- expensive child components
+- heavy images/media
+- repeated derived-data work
+- layout/paint cost
+- frequent reactive updates
+- network/data transformation
 
-const users = ref([])
+Do not treat item count alone as the decision criterion.
 
-onMounted(async () => {
-  // 10,000 DOM nodes created, browser struggles
-  users.value = await fetchAllUsers()
-})
-</script>
-```
+## Conceptual Virtualization Shape
 
-**GOOD:**
-```vue
-<template>
-  <!-- GOOD: Only renders ~20 visible items at a time -->
-  <RecycleScroller
-    class="user-list"
-    :items="users"
-    :item-size="80"
-    key-field="id"
-    v-slot="{ item }"
-  >
-    <UserCard :user="item" />
-  </RecycleScroller>
-</template>
-
-<script setup>
-import { ref, onMounted } from 'vue'
-import { RecycleScroller } from 'vue-virtual-scroller'
-import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
-import UserCard from './UserCard.vue'
-
-const users = ref([])
-
-onMounted(async () => {
-  // 10,000 items in memory, but only ~20 DOM nodes
-  users.value = await fetchAllUsers()
-})
-</script>
-
-<style scoped>
-.user-list {
-  height: 600px; /* Container must have fixed height */
-}
-</style>
-```
-
-## Using @tanstack/vue-virtual
+If the project already provides a virtual-list abstraction, the application code should usually consume that established abstraction instead of installing another package.
 
 ```vue
 <template>
-  <div ref="parentRef" class="list-container">
-    <div
-      :style="{
-        height: `${rowVirtualizer.getTotalSize()}px`,
-        position: 'relative'
-      }"
+    <ProjectVirtualList
+        :items="users"
+        item-key="id"
     >
-      <div
-        v-for="virtualRow in rowVirtualizer.getVirtualItems()"
-        :key="virtualRow.key"
-        :style="{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: `${virtualRow.size}px`,
-          transform: `translateY(${virtualRow.start}px)`
-        }"
-      >
-        <UserCard :user="users[virtualRow.index]" />
-      </div>
-    </div>
-  </div>
+        <template #default="{ item }">
+            <UserCard :user="item" />
+        </template>
+    </ProjectVirtualList>
 </template>
-
-<script setup>
-import { ref } from 'vue'
-import { useVirtualizer } from '@tanstack/vue-virtual'
-
-const users = ref([/* 10,000 users */])
-const parentRef = ref(null)
-
-const rowVirtualizer = useVirtualizer({
-  count: users.value.length,
-  getScrollElement: () => parentRef.value,
-  estimateSize: () => 80,  // Estimated row height
-  overscan: 5  // Render 5 extra items above/below viewport
-})
-</script>
-
-<style scoped>
-.list-container {
-  height: 600px;
-  overflow: auto;
-}
-</style>
 ```
 
-## Dynamic Heights with vue-virtual-scroller
+`ProjectVirtualList` is a placeholder for **whatever virtualization mechanism already belongs to the project**. It is not a library recommendation.
 
-```vue
-<template>
-  <!-- For variable height items, use DynamicScroller -->
-  <DynamicScroller
-    :items="messages"
-    :min-item-size="54"
-    key-field="id"
-  >
-    <template #default="{ item, index, active }">
-      <DynamicScrollerItem
-        :item="item"
-        :active="active"
-        :data-index="index"
-      >
-        <ChatMessage :message="item" />
-      </DynamicScrollerItem>
-    </template>
-  </DynamicScroller>
-</template>
+## If No Virtualization Solution Exists
 
-<script setup>
-import { DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller'
-</script>
-```
+Before adding a dependency, consider whether simpler product/UX changes solve the problem:
 
-## Performance Comparison
+- pagination
+- incremental loading
+- server-side filtering/search
+- collapsed sections
+- reducing item complexity
+- rendering a smaller result window
 
-| Approach | 100 Items | 1,000 Items | 10,000 Items |
-|----------|-----------|-------------|--------------|
-| Regular v-for | ~100 DOM nodes | ~1,000 DOM nodes | ~10,000 DOM nodes |
-| Virtualized | ~20 DOM nodes | ~20 DOM nodes | ~20 DOM nodes |
-| Initial render | Fast | Slow | Very slow / crashes |
-| Virtualized render | Fast | Fast | Fast |
+If those approaches do not satisfy the requirement and measurement shows that virtualization is needed, dependency selection should be an explicit architectural decision outside this generic Skill.
 
-## When NOT to Virtualize
+## Dynamic Height and Interaction Concerns
 
-- Lists under 50 items with simple content
-- Lists where all items must be accessible to screen readers simultaneously
-- Print layouts where all content must render
-- SEO-critical content that must be in initial HTML
+Virtualized lists become more complex when items have unpredictable heights or interactive state. Verify:
+
+- scroll position remains stable
+- focus/keyboard navigation remains usable
+- recycled rows do not leak stale local state
+- dynamic measurement does not cause visible jumping
+- automated tests can target rows reliably
+- accessibility requirements are still met
+
+Do not trade a small performance gain for fragile interaction behavior.
+
+## Accessibility and Rendering Requirements
+
+Virtualization may be inappropriate when the product requires all items to be mounted simultaneously, for example:
+
+- printing/export capture
+- browser find-in-page expectations
+- some accessibility flows
+- SEO/initial-content requirements in specific web architectures
+- scripts that intentionally inspect the full rendered tree
+
+Use the product requirement as the constraint rather than a generic list-size number.
+
+## Performance Rule
+
+There is no universal “virtualize above N items” threshold. Choose virtualization when realistic profiling shows that rendering only the visible window materially improves the required user experience without unacceptable complexity.

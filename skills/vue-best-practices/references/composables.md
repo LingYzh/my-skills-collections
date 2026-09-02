@@ -1,53 +1,74 @@
 ---
 title: Composable Organization Patterns
 impact: MEDIUM
-impactDescription: Well-structured composables improve maintainability, reusability, and update performance
+impactDescription: Composables are useful for coherent reusable or stateful concerns, but excessive extraction can make volatile business code harder to follow
 type: best-practice
 tags: [vue3, composables, composition-api, code-organization, api-design, readonly, utilities, javascript, jsdoc, typescript]
 ---
 
 # Composable Organization Patterns
 
-**Impact: MEDIUM** - Treat composables as reusable, stateful building blocks and keep their code organized by feature concern. This keeps large components maintainable and prevents hard-to-debug mutation and API design issues.
+Use composables when they create a meaningful state/behavior boundary. Do not extract logic merely to make a component shorter or to satisfy an arbitrary line-count rule.
 
 ## Task List
 
-- Compose complex behavior from small, focused composables
-- Choose the composable language by stability: JS for feature/volatile code, JS + optional JSDoc for moderately stable shared code, TS for stable library-like contracts
-- Use options objects for composables with multiple optional parameters
-- Return readonly state when updates must flow through explicit actions
-- Keep pure utility functions as plain utilities, not composables
-- Organize composable and component code by feature concern, and extract composables when components grow
+- Extract a composable when logic is reused or forms a coherent stateful/lifecycle concern
+- Keep rapidly changing one-off business orchestration close to the feature when extraction would increase navigation overhead
+- Choose JS / JSDoc / TS according to stability tiers
+- Use options objects when multiple optional arguments would otherwise be ambiguous
+- Return readonly state only when mutation ownership genuinely needs enforcement
+- Keep pure utilities as plain utilities
+- Avoid hidden global state and hidden side effects
+- Apply async request/loading rules from `async-interface-ui.md`
 
-## Choose composable language by stability
+## When to Extract a Composable
 
-A composable being reusable does **not** automatically make it a TypeScript candidate. Reuse scope and contract stability matter together.
+Good reasons include:
 
-### Tier A — Feature / volatile composables: JavaScript
+- the same behavior is reused
+- a coherent concern owns state plus lifecycle/side effects
+- a browser/platform integration needs isolated setup and cleanup
+- a complex feature concern becomes easier to reason about as one named unit
+- the logic has an independently meaningful API
 
-Use JavaScript for composables tightly coupled to changing product behavior:
+Weak reasons include:
 
-```javascript
+- the component passed an arbitrary line count
+- the script section “looks long”
+- every group of three refs can be given a `useXxx` name
+- a one-off business workflow is being split across files without reuse or conceptual separation
+
+For volatile business code, locality can be more maintainable than abstraction.
+
+## Choose Language by Stability
+
+### Tier A — Feature / volatile
+
+```js
 // composables/useOrderEditor.js
 import { ref } from 'vue'
 
 export function useOrderEditor() {
-  const draft = ref(null)
-  const saving = ref(false)
+    const draft = ref(null)
+    const saving = ref(false)
 
-  async function save() {
-    // changing business workflow
-  }
+    function reset() {
+        draft.value = null
+    }
 
-  return { draft, saving, save }
+    return {
+        draft,
+        saving,
+        reset
+    }
 }
 ```
 
-### Tier B — Shared / moderately stable composables: JavaScript + optional JSDoc
+### Tier B — Shared / moderately stable
 
-Add JSDoc at meaningful public boundaries without turning every internal detail into a type declaration:
+Use JavaScript and add JSDoc only at useful boundaries.
 
-```javascript
+```js
 /**
  * @typedef {Object} UseCounterOptions
  * @property {number} [initial]
@@ -60,279 +81,199 @@ Add JSDoc at meaningful public boundaries without turning every internal detail 
  * @param {UseCounterOptions} [options]
  */
 export function useCounter(options = {}) {
-  const {
-    initial = 0,
-    min = -Infinity,
-    max = Infinity,
-    step = 1,
-  } = options
+    const {
+        initial = 0,
+        min = -Infinity,
+        max = Infinity,
+        step = 1
+    } = options
 
-  // implementation
-  return { initial, min, max, step }
+    return {
+        initial,
+        min,
+        max,
+        step
+    }
 }
 ```
 
-### Tier C — Stable library-like composables: TypeScript
+### Tier C — Foundation / stable contract
 
-Prefer TypeScript when the composable is low-change, broadly reused, and exposes a mature public contract whose breakage would affect many consumers.
+TypeScript is appropriate for a low-change, broadly reused composable with a mature public contract. Do not migrate a feature composable to TypeScript merely because a second consumer appears.
 
-Do not migrate a feature composable to TypeScript merely because a second caller appears. Language migration should be explicit and justified by real contract stability.
+## Compose Only When the Smaller Pieces Are Meaningful
 
-## Compose Composables from Smaller Primitives
+A low-level composable can be valuable when its lifecycle cleanup is reusable:
 
-**BAD:**
-```vue
-<script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-
-const x = ref(0)
-const y = ref(0)
-const inside = ref(false)
-const el = ref(null)
-
-function onMove(e) {
-  x.value = e.pageX
-  y.value = e.pageY
-  if (!el.value) return
-  const r = el.value.getBoundingClientRect()
-  inside.value = x.value >= r.left && x.value <= r.right &&
-    y.value >= r.top && y.value <= r.bottom
-}
-
-onMounted(() => window.addEventListener('mousemove', onMove))
-onUnmounted(() => window.removeEventListener('mousemove', onMove))
-</script>
-```
-
-**GOOD:**
-```javascript
-// composables/useEventListener.js
+```js
 import { onMounted, onUnmounted, toValue } from 'vue'
 
 export function useEventListener(target, event, callback) {
-  onMounted(() => toValue(target).addEventListener(event, callback))
-  onUnmounted(() => toValue(target).removeEventListener(event, callback))
+    onMounted(() => {
+        toValue(target)?.addEventListener(event, callback)
+    })
+
+    onUnmounted(() => {
+        toValue(target)?.removeEventListener(event, callback)
+    })
 }
 ```
 
-```javascript
-// composables/useMouse.js
-import { ref } from 'vue'
-import { useEventListener } from './useEventListener'
+This example is browser-specific. In uni-app non-H5 targets, load `uni-app-platform.md` and do not assume `window`, DOM nodes, or DOM event APIs exist.
 
-export function useMouse() {
-  const x = ref(0)
-  const y = ref(0)
+Do not decompose one feature into many tiny composables when each one is used once and understanding the feature then requires opening several files.
 
-  useEventListener(window, 'mousemove', (e) => {
-    x.value = e.pageX
-    y.value = e.pageY
-  })
-
-  return { x, y }
-}
-```
-
-```javascript
-// composables/useMouseInElement.js
-import { computed } from 'vue'
-import { useMouse } from './useMouse'
-
-export function useMouseInElement(elementRef) {
-  const { x, y } = useMouse()
-
-  const isOutside = computed(() => {
-    if (!elementRef.value) return true
-    const rect = elementRef.value.getBoundingClientRect()
-    return x.value < rect.left || x.value > rect.right ||
-      y.value < rect.top || y.value > rect.bottom
-  })
-
-  return { x, y, isOutside }
-}
-```
-
-## Use Options Object Pattern for Composable Parameters
+## Use Options Objects for Ambiguous Optional Arguments
 
 **BAD:**
-```javascript
-export function useFetch(url, method, headers, timeout, retries, immediate) {
-  // hard to read and easy to misorder
-}
 
-useFetch('/api/users', 'GET', null, 5000, 3, true)
+```js
+useRequest('/api/users', 'POST', null, 5000, 3, true)
 ```
 
 **GOOD:**
-```javascript
-export function useFetch(url, options = {}) {
-  const {
-    method = 'GET',
-    headers = {},
-    timeout = 30000,
-    retries = 0,
-    immediate = true
-  } = options
 
-  // implementation
-  return { method, headers, timeout, retries, immediate }
-}
-
-useFetch('/api/users', {
-  method: 'POST',
-  timeout: 5000,
-  retries: 3
+```js
+useRequest('/api/users', {
+    method: 'POST',
+    timeout: 5000,
+    retries: 3,
+    immediate: true
 })
 ```
 
-For a Tier B shared composable, add JSDoc to this pattern only when the option shape is complex enough to benefit from editor help. For Tier C, a TypeScript interface is appropriate once the options contract is stable.
+Do not wrap a function in an options object when it has only one or two obvious required parameters.
 
-## Return Readonly State with Explicit Actions
+## Readonly State Is an Ownership Tool
 
-**BAD:**
-```javascript
-export function useCart() {
-  const items = ref([])
-  const total = computed(() => items.value.reduce((sum, item) => sum + item.price, 0))
-  return { items, total } // any consumer can mutate directly
-}
+Use `readonly()` when consumers should observe state but mutation should stay behind explicit actions.
 
-const { items } = useCart()
-items.value.push({ id: 1, price: 10 })
-```
-
-**GOOD:**
-```javascript
-import { ref, computed, readonly } from 'vue'
+```js
+import { computed, readonly, ref } from 'vue'
 
 export function useCart() {
-  const _items = ref([])
+    const items = ref([])
 
-  const total = computed(() =>
-    _items.value.reduce((sum, item) => sum + item.price * item.quantity, 0)
-  )
+    const total = computed(() => {
+        return items.value.reduce((sum, item) => {
+            return sum + item.price * item.quantity
+        }, 0)
+    })
 
-  function addItem(product, quantity = 1) {
-    const existing = _items.value.find(item => item.id === product.id)
-    if (existing) {
-      existing.quantity += quantity
-      return
+    function addItem(product, quantity = 1) {
+        const existing = items.value.find((item) => item.id === product.id)
+
+        if (existing) {
+            existing.quantity += quantity
+            return
+        }
+
+        items.value.push({
+            ...product,
+            quantity
+        })
     }
-    _items.value.push({ ...product, quantity })
-  }
 
-  function removeItem(productId) {
-    _items.value = _items.value.filter(item => item.id !== productId)
-  }
-
-  return {
-    items: readonly(_items),
-    total,
-    addItem,
-    removeItem
-  }
+    return {
+        items: readonly(items),
+        total,
+        addItem
+    }
 }
 ```
 
-## Keep Utilities as Utilities
+Do not add readonly/action ceremony to trivial local state where direct mutation is already clear and contained.
+
+## Keep Pure Utilities as Utilities
 
 **BAD:**
-```javascript
-export function useFormatters() {
-  const formatDate = (date) => new Intl.DateTimeFormat('en-US').format(date)
-  const formatCurrency = (amount) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount)
-  return { formatDate, formatCurrency }
-}
 
-const { formatDate } = useFormatters()
+```js
+export function useFormatters() {
+    function formatDate(date) {
+        return new Intl.DateTimeFormat('en-US').format(date)
+    }
+
+    return {
+        formatDate
+    }
+}
 ```
 
 **GOOD:**
-```javascript
-// utils/formatters.js
+
+```js
+// utils/formatDate.js
 export function formatDate(date) {
-  return new Intl.DateTimeFormat('en-US').format(date)
-}
-
-export function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD'
-  }).format(amount)
+    return new Intl.DateTimeFormat('en-US').format(date)
 }
 ```
 
-```javascript
-// composables/useInvoiceSummary.js
-import { computed } from 'vue'
-import { formatCurrency } from '@/utils/formatters'
+A function is not a composable merely because it can be named `useXxx`.
 
-export function useInvoiceSummary(invoiceRef) {
-  const totalLabel = computed(() => formatCurrency(invoiceRef.value.total))
-  return { totalLabel }
-}
-```
+## Keep Feature Logic Local Until a Boundary Helps
 
-## Organize Composable and Component Code by Feature Concern
+A single feature component can legitimately contain several related refs/computed/functions when they form one rapidly changing workflow.
 
-**BAD:**
+Extract only when a coherent concern emerges.
+
 ```vue
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { computed, ref } from 'vue'
 
 const searchQuery = ref('')
-const items = ref([])
-const selected = ref(null)
-const showModal = ref(false)
-const sortBy = ref('name')
-const filter = ref('all')
-const loading = ref(false)
+const selectedId = ref(null)
 
-const filtered = computed(() => items.value.filter(i => i.category === filter.value))
-function openModal() { showModal.value = true }
-const sorted = computed(() => [...filtered.value].sort(/* ... */))
-watch(searchQuery, () => { /* ... */ })
-onMounted(() => { /* ... */ })
+const visibleItems = computed(() => {
+    return items.value.filter((item) => {
+        return item.name.includes(searchQuery.value)
+    })
+})
+
+function selectItem(id) {
+    selectedId.value = id
+}
 </script>
 ```
 
-**GOOD:**
-```vue
-<script setup>
-import { useItems } from '@/composables/useItems'
-import { useSearch } from '@/composables/useSearch'
-import { useSelectionModal } from '@/composables/useSelectionModal'
+This is not automatically a “mega component”. Component/composable extraction should follow responsibility boundaries and maintenance cost, not a fixed count of refs or UI sections.
 
-// Data
-const { items, loading, fetchItems } = useItems()
+## Async Work Inside Composables
 
-// Search/filter/sort
-const { query, visibleItems } = useSearch(items)
+When a composable owns an API/interface request, prefer the Promise-chain convention from `async-interface-ui.md` and keep operation state explicit.
 
-// Selection + modal
-const { selectedItem, isModalOpen, selectItem, closeModal } = useSelectionModal()
-</script>
-```
-
-```javascript
-// composables/useItems.js
-import { ref, onMounted } from 'vue'
+```js
+import { ref } from 'vue'
 
 export function useItems() {
-  const items = ref([])
-  const loading = ref(false)
+    const items = ref([])
+    const loading = ref(false)
 
-  async function fetchItems() {
-    loading.value = true
-    try {
-      items.value = await api.getItems()
-    } finally {
-      loading.value = false
+    function fetchItems() {
+        if (loading.value) {
+            return Promise.resolve()
+        }
+
+        loading.value = true
+
+        return fetchItemsApi()
+            .then((result) => {
+                items.value = result
+            })
+            .catch((error) => {
+                handleItemsError(error)
+            })
+            .finally(() => {
+                loading.value = false
+            })
     }
-  }
 
-  onMounted(fetchItems)
-  return { items, loading, fetchItems }
+    return {
+        items,
+        loading,
+        fetchItems
+    }
 }
 ```
+
+A composable-level loading flag does not automatically disable UI. The consuming component must still apply the appropriate interaction lock when user actions could conflict.

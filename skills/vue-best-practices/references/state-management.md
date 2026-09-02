@@ -1,135 +1,167 @@
 ---
 title: State Management Strategy
 impact: HIGH
-impactDescription: Choosing the wrong store pattern can cause SSR request leaks, brittle mutation flows, and poor scaling
+impactDescription: State scope should match ownership and runtime lifetime without introducing unnecessary dependencies or SSR leakage
 type: best-practice
-tags: [vue3, state-management, pinia, composables, ssr, vueuse]
+tags: [vue3, state-management, composables, provide-inject, ssr, dependency-discipline]
 ---
 
 # State Management Strategy
 
-**Impact: HIGH** - Use the lightest state solution that fits your app architecture. SPA-only apps can use lightweight global composables, while SSR/Nuxt apps should default to Pinia for request-safe isolation and predictable tooling.
+Use the lightest state ownership model that fits the actual sharing boundary. Do not install or introduce a state-management dependency merely because state crosses one component boundary.
 
 ## Task List
 
-- Keep state local first, then promote to shared/global only when needed
-- Use singleton composables only in non-SSR applications
-- Expose global state as readonly and mutate through explicit actions
-- Prefer Pinia for SSR/Nuxt, large apps, and advanced debugging/plugin needs
-- Avoid exporting mutable module-level reactive state directly
+- Keep state local until multiple consumers genuinely need shared ownership
+- Prefer feature-scoped composables for feature state
+- Reuse the project's existing state-management solution when one is already established
+- Do not add a new runtime dependency solely because this reference mentions shared/global state
+- Avoid mutable module-level singleton state in SSR/request-scoped runtimes
+- Keep mutations easy to locate; expose explicit actions when shared state becomes complex
+- Apply the JS / JSDoc / TS stability tiers from the main Skill
 
-## Choose the Lightest Store Approach
+## Choose State Scope Before Choosing a Tool
 
-- **Feature composable:** Default for reusable logic with local/feature-level state.
-- **Singleton composable or VueUse `createGlobalState`:** Small non-SSR apps needing shared app state.
-- **Pinia:** SSR/Nuxt apps, medium-to-large apps, and cases requiring DevTools, plugins, or action tracing.
+Use this progression as a decision guide, not as a mandatory migration ladder:
 
-## Avoid Exporting Mutable Module State
+1. **Component-local state** — owned by one component or one small component subtree.
+2. **Feature composable** — shared inside one feature or reused by a small set of related components.
+3. **App-level shared state** — genuinely crosses feature boundaries or must survive independent component lifetimes.
+4. **Request-scoped/server state container** — required when SSR or another multi-request runtime must isolate state per request.
 
-**BAD:**
-```ts
-// store/cart.ts
+The question is **who owns the state and how long it must live**, not which library can be installed.
+
+## Keep Local State Local
+
+Do not promote state to a global store preemptively.
+
+```vue
+<script setup>
+import { ref } from 'vue'
+
+const isOpen = ref(false)
+const draft = ref('')
+</script>
+```
+
+If only this component or its immediate children need the state, local ownership is usually easier to understand and change.
+
+## Use a Feature Composable for Feature-Level Shared State
+
+```js
+// composables/useCart.js
+import { computed, readonly, ref } from 'vue'
+
+export function useCart() {
+    const items = ref([])
+
+    const total = computed(() => {
+        return items.value.reduce((sum, item) => {
+            return sum + item.price * item.quantity
+        }, 0)
+    })
+
+    function addItem(product, quantity = 1) {
+        const existing = items.value.find((item) => item.id === product.id)
+
+        if (existing) {
+            existing.quantity += quantity
+            return
+        }
+
+        items.value.push({
+            ...product,
+            quantity
+        })
+    }
+
+    return {
+        items: readonly(items),
+        total,
+        addItem
+    }
+}
+```
+
+Do not make a composable global merely by declaring mutable state at module scope unless global lifetime is explicitly intended.
+
+## Reuse Existing Project Infrastructure
+
+If the project already has an established state-management solution:
+
+- follow its existing store/module conventions
+- avoid creating a second competing global-state pattern
+- do not replace it as part of an unrelated feature change
+- use the dedicated Skill or project documentation for that state solution when available
+
+This generic Vue Skill should not prescribe or install a particular third-party state library.
+
+## Avoid Accidental Module Singletons
+
+A module-level reactive object has process/module lifetime, which may be broader than the component or request lifetime.
+
+**RISKY when global lifetime is not explicitly intended:**
+
+```js
 import { reactive } from 'vue'
 
-export const cart = reactive({
-  items: [] as Array<{ id: string; qty: number }>
+export const state = reactive({
+    user: null,
+    permissions: []
 })
 ```
 
-**GOOD:**
-```ts
-// composables/useCartStore.ts
+For client-only applications, an intentional singleton can be valid, but make that lifetime explicit. For SSR or multi-request runtimes, do not share user/request state through one module singleton.
+
+## Use Request-Scoped State in SSR
+
+Create mutable state per app/request, or use the request-safe state mechanism already established by the project.
+
+```js
 import { reactive, readonly } from 'vue'
 
-let _store: ReturnType<typeof createCartStore> | null = null
+export function createRequestState() {
+    const state = reactive({
+        user: null,
+        permissions: []
+    })
 
-function createCartStore() {
-  const state = reactive({
-    items: [] as Array<{ id: string; qty: number }>
-  })
-
-  function addItem(id: string, qty = 1) {
-    const existing = state.items.find((item) => item.id === id)
-    if (existing) {
-      existing.qty += qty
-      return
+    function setUser(user) {
+        state.user = user
     }
-    state.items.push({ id, qty })
-  }
 
-  return {
-    state: readonly(state),
-    addItem
-  }
-}
-
-export function useCartStore() {
-  if (!_store) _store = createCartStore()
-  return _store
-}
-```
-
-## Do Not Use Runtime Singletons in SSR
-
-Module singletons live for the runtime lifetime. In SSR this can leak state between requests.
-
-**BAD:**
-```ts
-// shared singleton reused across requests
-const cartStore = useCartStore()
-
-export function useServerCart() {
-  return cartStore
-}
-```
-
-**GOOD:**
-
-> `pinia` dependency required.
-
-```ts
-// stores/cart.ts
-import { defineStore } from 'pinia'
-
-export const useCartStore = defineStore('cart', {
-  state: () => ({
-    items: [] as Array<{ id: string; qty: number }>
-  }),
-  actions: {
-    addItem(id: string, qty = 1) {
-      const existing = this.items.find((item) => item.id === id)
-      if (existing) {
-        existing.qty += qty
-        return
-      }
-      this.items.push({ id, qty })
+    return {
+        state: readonly(state),
+        setUser
     }
-  }
-})
+}
 ```
 
-## Use `createGlobalState` for Small SPA Global State
+The important property is **new mutable state per request/app instance**. Do not introduce a package solely to satisfy this example; integrate with the runtime architecture that already exists.
 
-> `@vueuse/core` dependency required.
+## Keep Shared Mutations Traceable
 
-If the app is non-SSR and already uses VueUse, `createGlobalState` removes singleton boilerplate.
+When many consumers can change shared state, prefer explicit actions over arbitrary deep mutation from every consumer.
 
-```ts
-import { createGlobalState } from '@vueuse/core'
-import { computed, ref } from 'vue'
+```js
+function setCurrentWorkspace(workspace) {
+    state.currentWorkspace = workspace
+}
 
-export const useAuthState = createGlobalState(() => {
-  const token = ref<string | null>(null)
-  const isAuthenticated = computed(() => token.value !== null)
-
-  function setToken(next: string | null) {
-    token.value = next
-  }
-
-  return {
-    token,
-    isAuthenticated,
-    setToken
-  }
-})
+function clearCurrentWorkspace() {
+    state.currentWorkspace = null
+}
 ```
+
+This is a maintainability rule, not a requirement to wrap every trivial local assignment in an action.
+
+## Dependency Discipline
+
+Examples in this Skill are conceptual. They are **not permission to add dependencies**.
+
+Before adding any new runtime package for state management:
+
+1. Confirm the project does not already have an equivalent solution.
+2. Confirm native Vue primitives and existing project infrastructure are insufficient for the requirement.
+3. Make the dependency addition an explicit, justified change rather than an incidental refactor.
+4. Keep third-party-specific usage rules in a dedicated Skill or project-level documentation instead of expanding this generic Vue Skill.

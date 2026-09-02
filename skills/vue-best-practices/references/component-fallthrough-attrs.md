@@ -1,42 +1,26 @@
 ---
-title: Component Fallthrough Attributes Best Practices
+title: Component Fallthrough Attributes Guidance
 impact: MEDIUM
-impactDescription: Incorrect $attrs access and reactivity assumptions can cause undefined values and watchers that never run
+impactDescription: Correct fallthrough-attribute handling keeps wrapper components predictable without assuming attrs are reactive state
 type: best-practice
 tags: [vue3, attrs, fallthrough-attributes, composition-api, reactivity]
 ---
 
-# Component Fallthrough Attributes Best Practices
+# Component Fallthrough Attributes Guidance
 
-**Impact: MEDIUM** - Fallthrough attributes are straightforward once you follow Vue's conventions: hyphenated names use bracket notation, listener keys are camelCase `onX`, and `useAttrs()` is current-but-not-reactive.
+Use fallthrough attributes for wrapper/base components that intentionally pass ordinary attributes or listeners to an internal root/target element.
 
 ## Task List
 
-- Access hyphenated attribute names with bracket notation (for example `attrs['data-testid']`)
-- Access event listeners with camelCase `onX` keys (for example `attrs.onClick`)
-- Do not `watch()` values returned from `useAttrs()`; those watchers do not trigger on attr changes
-- Use `onUpdated()` for attr-driven side effects
-- Promote frequently observed attrs to props when reactive observation is required
+- Access hyphenated attr keys with bracket notation
+- Access listeners through their `onXxx` keys
+- Remember that `useAttrs()` exposes current attrs but is not normal watcher-tracked reactive state
+- Promote an attr to a real prop when the component needs to observe/use it as part of its explicit API
+- Use `inheritAttrs: false` only when the component needs deliberate forwarding control
+- Keep contracts explicit instead of turning important behavior into hidden `$attrs` coupling
 
-## Access Attribute and Listener Keys Correctly
+## Access Attr Keys Correctly
 
-Hyphenated attribute names preserve their original casing in JavaScript, so dot notation does not work for keys that include `-`.
-
-**BAD:**
-```vue
-<script setup>
-import { useAttrs } from 'vue'
-
-const attrs = useAttrs()
-
-console.log(attrs.data-testid)  // Syntax error
-console.log(attrs.dataTestid)   // undefined for data-testid
-console.log(attrs['on-click'])  // undefined
-console.log(attrs['@click'])    // undefined
-</script>
-```
-
-**GOOD:**
 ```vue
 <script setup>
 import { useAttrs } from 'vue'
@@ -45,130 +29,79 @@ const attrs = useAttrs()
 
 console.log(attrs['data-testid'])
 console.log(attrs['aria-label'])
-console.log(attrs['foo-bar'])
-
 console.log(attrs.onClick)
-console.log(attrs.onCustomEvent)
-console.log(attrs.onMouseEnter)
+console.log(attrs['onUpdate:modelValue'])
 </script>
 ```
 
-### Naming Reference
+Do not try dot notation for keys containing `-`.
 
-| Parent Usage | Access in `attrs` |
-|--------------|-------------------|
-| `class="foo"` | `attrs.class` |
-| `data-id="123"` | `attrs['data-id']` |
-| `aria-label="..."` | `attrs['aria-label']` |
-| `foo-bar="baz"` | `attrs['foo-bar']` |
-| `@click="fn"` | `attrs.onClick` |
-| `@custom-event="fn"` | `attrs.onCustomEvent` |
-| `@update:modelValue="fn"` | `attrs['onUpdate:modelValue']` |
+## Do Not Watch `useAttrs()` Like Normal Reactive State
 
-## `useAttrs()` Is Not Reactive
+If an input is important enough to drive reactive component logic, make it a prop instead of relying on an attrs watcher.
 
-`useAttrs()` always reflects the latest values, but it is intentionally not reactive for watcher tracking.
-
-**BAD:**
-```vue
-<script setup>
-import { watch, watchEffect, useAttrs } from 'vue'
-
-const attrs = useAttrs()
-
-watch(
-  () => attrs.someAttr,
-  (newValue) => {
-    console.log('Changed:', newValue) // Never runs on attr changes
-  }
-)
-
-watchEffect(() => {
-  console.log(attrs.class) // Runs on setup, not on attr updates
-})
-</script>
-```
-
-**GOOD:**
-```vue
-<script setup>
-import { onUpdated, useAttrs } from 'vue'
-
-const attrs = useAttrs()
-
-onUpdated(() => {
-  console.log('Latest attrs:', attrs)
-})
-</script>
-```
-
-**GOOD:**
 ```vue
 <script setup>
 import { watch } from 'vue'
 
 const props = defineProps({
-  someAttr: String
+    density: String
 })
 
 watch(
-  () => props.someAttr,
-  (newValue) => {
-    console.log('Changed:', newValue)
-  }
+    () => props.density,
+    (density) => {
+        applyDensity(density)
+    }
 )
 </script>
 ```
 
-## Common Patterns
+For rare side effects that genuinely need the latest fallthrough attrs after an update, read the attrs from an update lifecycle hook rather than pretending the attrs object is a normal reactive store.
 
-### Check for optional attrs safely
+## Deliberate Forwarding
 
-```vue
-<script setup>
-import { computed, useAttrs } from 'vue'
-
-const attrs = useAttrs()
-
-const hasTestId = computed(() => 'data-testid' in attrs)
-const ariaLabel = computed(() => attrs['aria-label'] ?? 'Default label')
-</script>
-```
-
-### Forward listeners after internal logic
+If a wrapper needs internal handling for an event **and** must forward the parent's listener, avoid forwarding that same listener twice.
 
 ```vue
 <script setup>
 import { useAttrs } from 'vue'
 
-defineOptions({ inheritAttrs: false })
+defineOptions({
+    inheritAttrs: false
+})
 
 const attrs = useAttrs()
 
+function getForwardedAttrs() {
+    const {
+        onClick,
+        ...forwardedAttrs
+    } = attrs
+
+    return forwardedAttrs
+}
+
 function handleClick(event) {
-  console.log('Internal handling first')
-  attrs.onClick?.(event)
+    runInternalBehavior(event)
+    attrs.onClick?.(event)
 }
 </script>
 
 <template>
-  <button @click="handleClick">
-    <slot />
-  </button>
+    <button
+        v-bind="getForwardedAttrs()"
+        @click="handleClick"
+    >
+        <slot />
+    </button>
 </template>
 ```
 
-## TypeScript Notes
+The important rule is to choose one forwarding path per listener. Do not both include `onClick` in `v-bind` and invoke `attrs.onClick` manually.
 
-`useAttrs()` is typed as `Record<string, unknown>`, so cast individual keys when needed.
+For simple transparent wrappers with no internal event handling, `v-bind="attrs"` is sufficient.
 
-```vue
-<script setup lang="ts">
-import { useAttrs } from 'vue'
+## Stability Tier
 
-const attrs = useAttrs()
-
-const testId = attrs['data-testid'] as string | undefined
-const onClick = attrs.onClick as ((event: MouseEvent) => void) | undefined
-</script>
-```
+JavaScript runtime attrs are the normal Tier A/B approach. In Tier C TypeScript foundation components, add types only when they protect a stable contract. Do not enable TypeScript merely to read one fallthrough attribute.

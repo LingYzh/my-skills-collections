@@ -1,187 +1,115 @@
 ---
-title: Avoid Expensive Operations in Updated Hook
+title: Avoid Expensive Work in Updated Hooks
 impact: MEDIUM
-impactDescription: Heavy computations in updated hook cause performance bottlenecks and potential infinite loops
+impactDescription: Updated hooks run after component updates and are easy to misuse for broad side effects or feedback loops
 type: capability
-tags: [vue3, vue2, lifecycle, updated, performance, optimization, reactivity]
+tags: [vue3, lifecycle, updated, performance, reactivity, platform]
 ---
 
-# Avoid Expensive Operations in Updated Hook
+# Avoid Expensive Work in Updated Hooks
 
-**Impact: MEDIUM** - The `updated` hook runs after every reactive state change that causes a re-render. Placing expensive operations, API calls, or state mutations here can cause severe performance degradation, infinite loops, and dropped frames below the optimal 60fps threshold.
-
-Use `updated`/`onUpdated` sparingly for post-DOM-update operations that cannot be handled by watchers or computed properties. For most reactive data handling, prefer watchers (`watch`/`watchEffect`) which provide more control over what triggers the callback.
+Use `onUpdated()` only for post-render work that genuinely needs to observe the rendered result. Do not use it as a generic “something changed” callback.
 
 ## Task List
 
-- Never perform API calls in updated hook
-- Never mutate reactive state inside updated (causes infinite loops)
-- Use conditional checks to verify updates are relevant before acting
-- Prefer `watch` or `watchEffect` for reacting to specific data changes
-- Use throttling/debouncing if updated operations are expensive
-- Reserve updated for low-level DOM synchronization tasks
+- Do not start ordinary API synchronization from `onUpdated()`
+- Do not mutate reactive state unconditionally inside the hook
+- Prefer `watch()` / `computed()` when the trigger is known reactive data
+- Keep DOM/post-render work narrow and guarded
+- Reuse an existing project debounce/throttle helper if rate limiting is required; do not install one from this reference
+- Apply the uni-app platform gate before writing browser DOM synchronization
 
-**BAD:**
-```javascript
-// BAD: API call in updated - fires on every re-render
-export default {
-  data() {
-    return { items: [], lastUpdate: null }
-  },
-  updated() {
-    // This runs after every single state change!
-    fetch('/api/sync', {
-      method: 'POST',
-      body: JSON.stringify(this.items)
-    })
-  }
-}
-```
+## Prefer a Targeted Watcher
 
-```javascript
-// BAD: State mutation in updated - infinite loop
-export default {
-  data() {
-    return { renderCount: 0 }
-  },
-  updated() {
-    // This causes another update, which triggers updated again!
-    this.renderCount++ // Infinite loop
-  }
-}
-```
-
-```javascript
-// BAD: Heavy computation on every update
-export default {
-  updated() {
-    // Expensive operation runs on every keystroke, every state change
-    this.processedData = this.heavyComputation(this.rawData)
-    this.analytics = this.calculateMetrics(this.allData)
-  }
-}
-```
-
-**GOOD:**
-```javascript
-import debounce from 'lodash-es/debounce'
-
-// GOOD: Use watcher for specific data changes
-export default {
-  data() {
-    return { items: [] }
-  },
-  watch: {
-    // Only fires when items actually changes
-    items: {
-      handler(newItems) {
-        this.syncToServer(newItems)
-      },
-      deep: true
-    }
-  },
-  methods: {
-    syncToServer: debounce(function(items) {
-      fetch('/api/sync', {
-        method: 'POST',
-        body: JSON.stringify(items)
-      })
-    }, 500)
-  }
-}
-```
+If the behavior is triggered by a particular source value, watch that source directly.
 
 ```vue
-<!-- GOOD: Composition API with targeted watchers -->
 <script setup>
-import { ref, watch, onUpdated } from 'vue'
-import { useDebounceFn } from '@vueuse/core'
+import { ref, watch } from 'vue'
 
 const items = ref([])
-const scrollContainer = ref(null)
 
-// Watch specific data - not all updates
-watch(items, (newItems) => {
-  syncToServer(newItems)
-}, { deep: true })
+watch(
+    items,
+    (nextItems) => {
+        queueSync(nextItems)
+    },
+    {
+        deep: true
+    }
+)
+</script>
+```
 
-const syncToServer = useDebounceFn((items) => {
-  fetch('/api/sync', { method: 'POST', body: JSON.stringify(items) })
-}, 500)
+If `queueSync()` performs an API request, it must follow `async-interface-ui.md` when the operation has user-visible/conflicting UI behavior.
 
-// Only use onUpdated for DOM synchronization
+## Do Not Mutate State Unconditionally in `onUpdated()`
+
+**BAD:**
+
+```vue
+<script setup>
+import { onUpdated, ref } from 'vue'
+
+const renderCount = ref(0)
+
 onUpdated(() => {
-  // Scroll to bottom only if content changed height
-  if (scrollContainer.value) {
-    scrollContainer.value.scrollTop = scrollContainer.value.scrollHeight
-  }
+    renderCount.value += 1
 })
 </script>
 ```
 
-```javascript
-// GOOD: Conditional check in updated hook
-export default {
-  data() {
-    return {
-      content: '',
-      lastSyncedContent: ''
+That mutation can trigger another update and create a feedback loop.
+
+## Valid Post-render Work
+
+A narrow browser example:
+
+```vue
+<script setup>
+import { onUpdated, useTemplateRef } from 'vue'
+
+const listRef = useTemplateRef('list')
+
+onUpdated(() => {
+    const element = listRef.value
+
+    if (!element) {
+        return
     }
-  },
-  updated() {
-    // Only act if specific condition is met
-    if (this.content !== this.lastSyncedContent) {
-      this.syncContent()
-      this.lastSyncedContent = this.content
-    }
-  },
-  methods: {
-    syncContent: debounce(function() {
-      // Sync logic
-    }, 300)
-  }
-}
+
+    maintainScrollPosition(element)
+})
+</script>
+
+<template>
+    <div ref="list">
+        <slot />
+    </div>
+</template>
 ```
 
-## Valid Use Cases for Updated Hook
+This is browser DOM-oriented. In uni-app non-H5 targets, load `uni-app-platform.md` and use a compatible project/platform approach instead.
 
-```javascript
-// GOOD: Low-level DOM synchronization
-export default {
-  updated() {
-    // Sync third-party library with Vue's DOM
-    this.thirdPartyWidget.refresh()
+## Derived Data Belongs in `computed()`
 
-    // Update scroll position after content change
-    this.$nextTick(() => {
-      this.maintainScrollPosition()
-    })
-  }
-}
+```js
+const total = computed(() => {
+    return numbers.value.reduce((sum, number) => {
+        return sum + number
+    }, 0)
+})
 ```
 
-## Prefer Computed Properties for Derived Data
+Do not assign derived data from an update hook.
 
-```javascript
-// BAD: Calculating derived data in updated
-export default {
-  data() {
-    return { numbers: [1, 2, 3, 4, 5] }
-  },
-  updated() {
-    this.sum = this.numbers.reduce((a, b) => a + b, 0) // Causes another update!
-  }
-}
+## Rate Limiting
 
-// GOOD: Use computed property instead
-export default {
-  data() {
-    return { numbers: [1, 2, 3, 4, 5] }
-  },
-  computed: {
-    sum() {
-      return this.numbers.reduce((a, b) => a + b, 0)
-    }
-  }
-}
-```
+If a legitimate watched/post-render operation is too frequent:
+
+1. verify the operation itself is necessary
+2. reduce the trigger scope first
+3. reuse the project's existing throttle/debounce helper if one exists
+4. add custom timing/dependencies only as an explicit requirement
+
+This generic Skill intentionally does not recommend a debounce/throttle package or universal delay value.

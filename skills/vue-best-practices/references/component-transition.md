@@ -1,125 +1,86 @@
 ---
-title: Transition Component Best Practices
+title: Transition Component Guidance
 impact: MEDIUM
-impactDescription: Transition animates a single element or component; incorrect structure or keys prevent animations
+impactDescription: Transition is useful for intentional enter/leave motion on supported targets; animation choices should follow project motion conventions
 type: best-practice
-tags: [vue3, transition, animation, performance, keys]
+tags: [vue3, transition, animation, keys, platform]
 ---
 
-# Transition Component Best Practices
+# Transition Component Guidance
 
-**Impact: MEDIUM** - `<Transition>` animates entering/leaving of a single element or component. It is ideal for toggling UI states, swapping views, or animating one component at a time.
+Use `<Transition>` for intentional enter/leave or single-view swap motion when the target platform supports it.
 
 ## Task List
 
-- Wrap a single element or component inside `<Transition>`
-- Provide a `key` when switching between same element types
-- Use `mode="out-in"` when you need sequential swaps
-- Prefer `transform` and `opacity` for smooth animations
+- Confirm platform support first in uni-app
+- Use one direct transition child
+- Add stable keys when identity changes must trigger a swap
+- Use `mode="out-in"` only when sequential replacement is desired
+- Prefer motion properties that do not force expensive layout when practical
+- Reuse project motion durations/easing instead of inventing Skill-provided values
+- Do not animate UI solely because Transition is available
 
-## Use Transition for a Single Root Element
+## Single Child
 
-`<Transition>` only supports one direct child. Wrap multiple nodes in a single element or component.
-
-**BAD:**
 ```vue
 <template>
-  <Transition name="fade">
-    <h3>Title</h3>
-    <p>Description</p>
-  </Transition>
+    <Transition name="fade">
+        <section v-if="isVisible">
+            <h3>Title</h3>
+            <p>Description</p>
+        </section>
+    </Transition>
 </template>
 ```
 
-**GOOD:**
+## Identity During Swaps
+
 ```vue
 <template>
-  <Transition name="fade">
-    <div>
-      <h3>Title</h3>
-      <p>Description</p>
-    </div>
-  </Transition>
+    <Transition
+        name="fade"
+        mode="out-in"
+    >
+        <p
+            v-if="isActive"
+            key="active"
+        >
+            Active
+        </p>
+
+        <p
+            v-else
+            key="inactive"
+        >
+            Inactive
+        </p>
+    </Transition>
 </template>
 ```
 
-## Force Transitions Between Same Element Types
+Use a key only when the UI should be treated as a different identity. Do not add keys blindly to force remounting.
 
-Vue reuses the same DOM element when the tag type does not change. Add `key` so Vue treats it as a new element and triggers enter/leave.
+## Motion CSS
 
-**BAD:**
-```vue
-<template>
-  <Transition name="fade">
-    <p v-if="isActive">Active</p>
-    <p v-else>Inactive</p>
-  </Transition>
-</template>
-```
+Prefer the project's existing motion tokens/variables when available.
 
-**GOOD:**
-```vue
-<template>
-  <Transition name="fade" mode="out-in">
-    <p v-if="isActive" key="active">Active</p>
-    <p v-else key="inactive">Inactive</p>
-  </Transition>
-</template>
-```
-
-## Use `mode` to Avoid Overlap During Swaps
-
-When swapping components or views, use `mode="out-in"` to prevent both from being visible at the same time.
-
-**BAD:**
-```vue
-<template>
-  <Transition name="fade">
-    <component :is="currentView" />
-  </Transition>
-</template>
-```
-
-**GOOD:**
-```vue
-<template>
-  <Transition name="fade" mode="out-in">
-    <component :is="currentView" :key="currentView" />
-  </Transition>
-</template>
-```
-
-## Animate `transform` and `opacity` for Performance
-
-Avoid layout-triggering properties such as `height`, `margin`, or `top`. Use `transform` and `opacity` for smooth, GPU-friendly transitions.
-
-**BAD:**
 ```css
-.slide-enter-active,
-.slide-leave-active {
-  transition: height 0.3s ease;
+.fade-enter-active,
+.fade-leave-active {
+    transition:
+        opacity var(--motion-duration) var(--motion-easing),
+        transform var(--motion-duration) var(--motion-easing);
 }
 
-.slide-enter-from,
-.slide-leave-to {
-  height: 0;
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
+    transform: translateY(var(--motion-distance));
 }
 ```
 
-**GOOD:**
-```css
-.slide-enter-active,
-.slide-leave-active {
-  transition: transform 0.3s ease, opacity 0.3s ease;
-}
+The variable names are placeholders for project-owned conventions, not a requirement to introduce a design-system dependency.
 
-.slide-enter-from {
-  transform: translateX(-12px);
-  opacity: 0;
-}
+## Platform Gate
 
-.slide-leave-to {
-  transform: translateX(12px);
-  opacity: 0;
-}
-```
+For uni-app, load `uni-app-platform.md` first. Transition support differs between H5/App/mini-program targets, so Web Vue examples must not be copied into unsupported builds.

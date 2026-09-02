@@ -1,137 +1,100 @@
 ---
-title: KeepAlive Component Best Practices
-impact: HIGH
-impactDescription: KeepAlive caches component instances; misuse causes stale data, memory growth, or unexpected lifecycle behavior
+title: KeepAlive Component Guidance
+impact: MEDIUM
+impactDescription: KeepAlive preserves component instances; use it only when preserving state is an intentional product behavior
 type: best-practice
-tags: [vue3, keepalive, cache, performance, router, dynamic-components]
+tags: [vue3, keepalive, cache, lifecycle, performance, platform]
 ---
 
-# KeepAlive Component Best Practices
+# KeepAlive Component Guidance
 
-**Impact: HIGH** - `<KeepAlive>` caches component instances instead of destroying them. Use it to preserve state across switches, but manage cache size and freshness explicitly to avoid memory growth or stale UI.
+Use `<KeepAlive>` when preserving a component instance across switches is explicitly useful. Do not add caching merely to avoid remounting without understanding freshness and lifetime requirements.
 
 ## Task List
 
-- Use KeepAlive only where state preservation improves UX
-- Set a reasonable `max` to cap cache size
-- Declare component names for include/exclude matching
-- Use `onActivated`/`onDeactivated` for cache-aware logic
-- Decide how and when cached views refresh their data
-- Avoid caching memory-heavy or security-sensitive views
+- Confirm the target platform supports KeepAlive
+- Decide whether state should persist or reset when the view becomes inactive
+- Handle activation/deactivation lifecycle when background work must pause or refresh
+- Add cache bounds only when the application can actually accumulate enough cached instances to require them
+- Define a freshness/invalidation strategy for data that can become stale
+- Do not copy arbitrary cache-size numbers from examples
 
-## When to Use KeepAlive
-
-Use KeepAlive when switching between views where state should persist (tabs, multi-step forms, dashboards). Avoid it when each visit should start fresh.
-
-**BAD:**
-```vue
-<template>
-  <!-- State resets on every switch -->
-  <component :is="currentTab" />
-</template>
-```
-
-**GOOD:**
-```vue
-<template>
-  <!-- State preserved between switches -->
-  <KeepAlive>
-    <component :is="currentTab" />
-  </KeepAlive>
-</template>
-```
-
-## When NOT to Use KeepAlive
-
-- Search or filter pages where users expect fresh results
-- Memory-heavy components (maps, large tables, media players)
-- Sensitive flows where data must be cleared on exit
-- Components with heavy background activity you cannot pause
-
-## Limit and Control the Cache
-
-Always cap cache size with `max` and restrict caching to specific components when possible.
+## Basic Use
 
 ```vue
 <template>
-  <KeepAlive :max="5" include="Dashboard,Settings">
-    <component :is="currentView" />
-  </KeepAlive>
+    <KeepAlive>
+        <component :is="currentPanel" />
+    </KeepAlive>
 </template>
 ```
 
-## Ensure Component Names Match include/exclude
+This is appropriate only when `currentPanel` switching and instance preservation are supported by the current runtime.
 
-`include` and `exclude` match the component `name` option. Explicitly set names for reliable caching.
-
-```vue
-<!-- TabA.vue -->
-<script setup>
-defineOptions({ name: 'TabA' })
-</script>
-```
-
-```vue
-<template>
-  <KeepAlive include="TabA,TabB">
-    <component :is="currentTab" />
-  </KeepAlive>
-</template>
-```
-
-## Cache Invalidation Strategies
-
-Vue 3 has no direct API to remove a specific cached instance. Use keys or dynamic include/exclude to force refreshes.
+## Activation Lifecycle
 
 ```vue
 <script setup>
-import { ref, reactive } from 'vue'
-
-const currentView = ref('Dashboard')
-const viewKeys = reactive({ Dashboard: 0, Settings: 0 })
-
-function invalidateCache(view) {
-  viewKeys[view]++
-}
-</script>
-
-<template>
-  <KeepAlive>
-    <component :is="currentView" :key="`${currentView}-${viewKeys[currentView]}`" />
-  </KeepAlive>
-</template>
-```
-
-## Lifecycle Hooks for Cached Components
-
-Cached components are not destroyed on switch. Use activation hooks for refresh and cleanup.
-
-```vue
-<script setup>
-import { onActivated, onDeactivated } from 'vue'
+import {
+    onActivated,
+    onDeactivated
+} from 'vue'
 
 onActivated(() => {
-  refreshData()
+    refreshIfNeeded()
 })
 
 onDeactivated(() => {
-  pauseTimers()
+    pauseBackgroundWork()
 })
 </script>
 ```
 
-## Router Caching and Freshness
+Do not refresh automatically on every activation unless the feature actually requires fresh data each time.
 
-Decide whether navigation should show cached state or a fresh view. A common pattern is to key by route when params change.
+## Cache Bounds Are Requirement-Driven
+
+`max` can limit cached instances, but there is no universal correct value.
 
 ```vue
 <template>
-  <router-view v-slot="{ Component, route }">
-    <KeepAlive>
-      <component :is="Component" :key="route.fullPath" />
+    <KeepAlive :max="cacheLimit">
+        <component :is="currentPanel" />
     </KeepAlive>
-  </router-view>
 </template>
 ```
 
-If you want cache reuse but fresh data, refresh in `onActivated` and compare query/params before fetching.
+`cacheLimit` should come from the application's view set, memory behavior, and UX expectations. Do not hard-code a Skill-provided value such as `5` simply because it appeared in documentation.
+
+## Invalidation
+
+When a cached view must be recreated, use an existing project pattern such as changing the rendered key or changing which components are included in the cache.
+
+```vue
+<template>
+    <KeepAlive>
+        <component
+            :is="currentPanel"
+            :key="panelKey"
+        />
+    </KeepAlive>
+</template>
+```
+
+Do not build a custom cache manager unless the product actually needs one.
+
+## Do Not Cache by Default
+
+Avoid KeepAlive when:
+
+- each visit should intentionally start fresh
+- the component owns large/native resources that should be released
+- background activity cannot be paused safely
+- sensitive temporary state should disappear on exit
+- preserving stale UI would confuse users
+
+## uni-app Platform Gate
+
+For uni-app, load `uni-app-platform.md` first. KeepAlive support differs by target; do not copy a Web Vue caching pattern into App/mini-program code unless the target compatibility is confirmed.
+
+This generic reference intentionally avoids router-specific caching recipes. Follow the project's existing routing architecture instead of introducing a routing dependency or pattern from an example.

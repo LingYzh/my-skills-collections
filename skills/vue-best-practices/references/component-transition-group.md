@@ -1,128 +1,68 @@
 ---
-title: TransitionGroup Component Best Practices
+title: TransitionGroup Component Guidance
 impact: MEDIUM
-impactDescription: TransitionGroup animates list items; missing keys or misuse leads to broken list transitions
+impactDescription: TransitionGroup animates keyed collection changes on supported targets; it should not introduce arbitrary timing or platform assumptions
 type: best-practice
-tags: [vue3, transition-group, animation, lists, keys]
+tags: [vue3, transition-group, animation, lists, keys, platform]
 ---
 
-# TransitionGroup Component Best Practices
+# TransitionGroup Component Guidance
 
-**Impact: MEDIUM** - `<TransitionGroup>` animates lists of items entering, leaving, and moving. Use it for `v-for` lists or dynamic collections where individual items change over time.
+Use `<TransitionGroup>` when individual keyed list items need enter/leave/move animation and the target runtime supports the component.
 
 ## Task List
 
-- Use `<TransitionGroup>` only for lists and repeated items
-- Provide unique, stable keys for every direct child
-- Use `tag` when you need semantic or layout wrappers
-- Avoid the `mode` prop (not supported)
-- Use JavaScript hooks for staggered effects
+- Confirm platform support first in uni-app
+- Use stable keys that represent item identity
+- Use `tag` only when a wrapper element is actually required
+- Do not use the `<Transition>` `mode` prop on TransitionGroup
+- Reuse the project's motion timing/easing conventions
+- Avoid JavaScript stagger logic unless the product explicitly needs it
 
-## Use TransitionGroup for Lists
+## Keyed List
 
-`<TransitionGroup>` is designed for list items. Use `tag` to control the wrapper element when needed.
-
-**BAD:**
 ```vue
 <template>
-  <TransitionGroup name="fade">
-    <ComponentA />
-    <ComponentB />
-  </TransitionGroup>
+    <TransitionGroup
+        name="list"
+        tag="ul"
+    >
+        <li
+            v-for="item in items"
+            :key="item.id"
+        >
+            {{ item.name }}
+        </li>
+    </TransitionGroup>
 </template>
 ```
 
-**GOOD:**
-```vue
-<template>
-  <TransitionGroup name="list" tag="ul">
-    <li v-for="item in items" :key="item.id">
-      {{ item.name }}
-    </li>
-  </TransitionGroup>
-</template>
-```
+Do not use an array index as the key when list insertion/removal/reordering can occur and a stable item identity exists.
 
-## Always Provide Stable Keys
+## Motion CSS
 
-Keys are required. Without stable keys, Vue cannot track item positions and animations break.
-
-**BAD:**
-```vue
-<template>
-  <TransitionGroup name="list" tag="ul">
-    <li v-for="(item, index) in items" :key="index">
-      {{ item.name }}
-    </li>
-  </TransitionGroup>
-</template>
-```
-
-**GOOD:**
-```vue
-<template>
-  <TransitionGroup name="list" tag="ul">
-    <li v-for="item in items" :key="item.id">
-      {{ item.name }}
-    </li>
-  </TransitionGroup>
-</template>
-```
-
-## Do Not Use `mode` on TransitionGroup
-
-`mode` is only for `<Transition>` because it swaps a single element. Use `<Transition>` if you need in/out sequencing.
-
-**BAD:**
-```vue
-<template>
-  <TransitionGroup name="list" tag="div" mode="out-in">
-    <div v-for="item in items" :key="item.id">{{ item.name }}</div>
-  </TransitionGroup>
-</template>
-```
-
-**GOOD:**
-```vue
-<template>
-  <Transition name="fade" mode="out-in">
-    <component :is="currentView" :key="currentView" />
-  </Transition>
-</template>
-```
-
-## Stagger List Animations with Data Attributes
-
-For cascading list animations, pass the index to JavaScript hooks and compute delay per item.
-
-```vue
-<template>
-  <TransitionGroup
-    tag="ul"
-    :css="false"
-    @before-enter="onBeforeEnter"
-    @enter="onEnter"
-  >
-    <li v-for="(item, index) in items" :key="item.id" :data-index="index">
-      {{ item.name }}
-    </li>
-  </TransitionGroup>
-</template>
-
-<script setup>
-function onBeforeEnter(el) {
-  el.style.opacity = 0
-  el.style.transform = 'translateY(12px)'
+```css
+.list-enter-active,
+.list-leave-active,
+.list-move {
+    transition:
+        opacity var(--motion-duration) var(--motion-easing),
+        transform var(--motion-duration) var(--motion-easing);
 }
 
-function onEnter(el, done) {
-  const delay = Number(el.dataset.index) * 80
-  setTimeout(() => {
-    el.style.transition = 'all 0.25s ease'
-    el.style.opacity = 1
-    el.style.transform = 'translateY(0)'
-    setTimeout(done, 250)
-  }, delay)
+.list-enter-from,
+.list-leave-to {
+    opacity: 0;
+    transform: translateY(var(--motion-distance));
 }
-</script>
 ```
+
+Use project-owned tokens/variables or existing animation classes. Do not copy arbitrary millisecond values from a Skill example.
+
+## Staggered Motion
+
+If staggered animation is an explicit product requirement, use the simplest existing project animation mechanism that supports it. Do not introduce a JavaScript animation package or complex timeout choreography solely because TransitionGroup supports JS hooks.
+
+## Platform Gate
+
+For uni-app, load `uni-app-platform.md` first. TransitionGroup support differs by target and should be treated as Web Vue guidance until compatibility is confirmed.

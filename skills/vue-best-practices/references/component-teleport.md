@@ -1,108 +1,83 @@
 ---
-title: Teleport Component Best Practices
+title: Teleport Component Guidance
 impact: MEDIUM
-impactDescription: Teleport renders content outside the component's DOM position, which is essential for overlays but affects styling and layout
+impactDescription: Teleport changes rendered DOM placement while preserving Vue hierarchy; support and usefulness depend on the target platform
 type: best-practice
-tags: [vue3, teleport, modal, overlay, positioning, responsive]
+tags: [vue3, teleport, overlay, positioning, platform]
 ---
 
-# Teleport Component Best Practices
+# Teleport Component Guidance
 
-**Impact: MEDIUM** - `<Teleport>` renders part of a component's template in a different place in the DOM while preserving the Vue component hierarchy. Use it for overlays (modals, toasts, tooltips) or any UI that must escape stacking contexts, overflow, or fixed positioning constraints.
+Use `<Teleport>` when browser-rendered UI must escape an ancestor's stacking/overflow/layout context, such as a modal or overlay rendered into an application-owned overlay root.
 
 ## Task List
 
-- Teleport overlays to `body` or a dedicated container outside the app root
-- Keep a shared target for similar UI (`#modals`, `#notifications`) and control layering with order or z-index
-- Use `:disabled` for responsive layouts that should render inline on small screens
-- Remember props, emits, and provide/inject still work through teleport
-- Avoid relying on parent stacking contexts or transforms for teleported UI
+- Confirm the target platform supports Teleport
+- Use an existing project overlay target/convention when one exists
+- Ensure the target exists before the teleported content renders
+- Keep ownership/data flow in the original Vue component hierarchy
+- Do not add an overlay/responsive dependency from this reference
+- In uni-app, load `uni-app-platform.md` first because Teleport support varies by target
 
-## Teleport Overlays Out of Transformed Containers
+## Basic Overlay
 
-When an ancestor has `transform`, `filter`, or `perspective`, fixed-position overlays can behave like they are locally positioned. Teleport escapes that context.
-
-**BAD:**
 ```vue
 <template>
-  <div class="animated-container">
-    <button @click="open = true">Open</button>
+    <button @click="isOpen = true">
+        Open
+    </button>
 
-    <!-- Broken: fixed positioning is scoped to the transformed parent -->
-    <div v-if="open" class="modal">Modal</div>
-  </div>
-</template>
-
-<style>
-.animated-container {
-  transform: translateZ(0);
-}
-
-.modal {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-}
-</style>
-```
-
-**GOOD:**
-```vue
-<template>
-  <div class="animated-container">
-    <button @click="open = true">Open</button>
-
-    <Teleport to="body">
-      <div v-if="open" class="modal">Modal</div>
+    <Teleport to="#overlay-root">
+        <ModalPanel
+            v-if="isOpen"
+            @close="isOpen = false"
+        />
     </Teleport>
-  </div>
 </template>
 ```
 
-## Responsive Layouts with `disabled`
+Prefer a target already owned by the application rather than creating new global containers during unrelated work.
 
-Use `:disabled` to render inline on mobile and teleport on larger screens:
+## Conditional Teleport
+
+If a layout sometimes renders content inline, drive `:disabled` from existing component/project state.
 
 ```vue
 <script setup>
-import { useMediaQuery } from '@vueuse/core'
-
-const isMobile = useMediaQuery('(max-width: 768px)')
+const props = defineProps({
+    renderInline: Boolean
+})
 </script>
 
 <template>
-  <Teleport to="body" :disabled="isMobile">
-    <nav class="sidebar">Navigation</nav>
-  </Teleport>
+    <Teleport
+        to="#overlay-root"
+        :disabled="props.renderInline"
+    >
+        <SidePanel />
+    </Teleport>
 </template>
 ```
 
-## Logical Hierarchy Is Preserved
+This Skill intentionally does not recommend a media-query package. Reuse the project's existing responsive state when responsive behavior is required.
 
-Teleport changes DOM position, not the Vue component tree. Props, emits, slots, and provide/inject still work:
+## Logical Hierarchy Remains Vue-Owned
+
+Teleport changes render placement, not component ownership. Props, events, slots, and provide/inject continue through the Vue hierarchy.
 
 ```vue
 <template>
-  <Teleport to="body">
-    <ChildPanel :message="message" @close="open = false" />
-  </Teleport>
+    <Teleport to="#overlay-root">
+        <ChildPanel
+            :message="message"
+            @close="isOpen = false"
+        />
+    </Teleport>
 </template>
 ```
 
-## Multiple Teleports to the Same Target
+## Platform Gate
 
-Teleports to the same target append in declaration order:
+In uni-app, Teleport is not universally supported across H5, App, and mini-program targets. Do not use it until `uni-app-platform.md` confirms the current target/runtime is compatible.
 
-```vue
-<template>
-  <Teleport to="#notifications">
-    <div>First</div>
-  </Teleport>
-
-  <Teleport to="#notifications">
-    <div>Second</div>
-  </Teleport>
-</template>
-```
-
-Use a shared container to keep stacking predictable, and apply z-index only when you need explicit layering.
+If the project already has a platform-native modal/overlay abstraction, prefer that existing abstraction rather than forcing Teleport into cross-platform code.

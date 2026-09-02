@@ -1,37 +1,27 @@
 ---
-title: Render Function Patterns and Performance
+title: Render Function Guidance
 impact: MEDIUM
-impactDescription: Render functions require explicit patterns for lists, events, v-model, and performance to stay correct and maintainable
+impactDescription: Render functions are lower-level than templates and should be reserved for requirements that benefit from programmatic VNode construction
 type: best-practice
-tags: [vue3, render-function, h, v-model, directives, performance, jsx]
+tags: [vue3, render-function, h, v-model, directives, jsx, platform]
 ---
 
-# Render Function Patterns and Performance
+# Render Function Guidance
 
-**Impact: MEDIUM** - Render functions are powerful but opt out of template compiler optimizations. Use them intentionally and apply the key patterns below to keep output correct and performant.
+Prefer Vue templates for ordinary application UI. Use render functions when programmatic VNode construction is genuinely clearer or required by a low-level reusable abstraction.
 
 ## Task List
 
-- Prefer templates; use render functions only when templates cannot express the logic
-- Always add stable keys when rendering lists with `h()`/JSX
-- Use `withModifiers` / `withKeys` for event modifiers
-- Implement `v-model` via `modelValue` + `onUpdate:modelValue`
-- Apply custom directives with `withDirectives`
-- Use functional components for stateless presentational UI
+- Prefer templates for normal business components
+- Use stable keys for programmatically rendered collections
+- Keep explicit component model/update contracts
+- Use Vue render helpers rather than manually emulating template behavior
+- Keep render-function code small and well-contained
+- Do not convert templates to render functions as an incidental refactor
+- Apply the uni-app platform gate before assuming every Web Vue render pattern compiles/behaves identically
 
-## Prefer templates over render functions
+## Prefer a Template When It Is Clearer
 
-**BAD:**
-```vue
-<script setup>
-import { h, ref } from 'vue'
-
-const count = ref(0)
-const render = () => h('div', `Count: ${count.value}`)
-</script>
-```
-
-**GOOD:**
 ```vue
 <script setup>
 import { ref } from 'vue'
@@ -40,162 +30,69 @@ const count = ref(0)
 </script>
 
 <template>
-  <div>Count: {{ count }}</div>
+    <div>
+        Count: {{ count }}
+    </div>
 </template>
 ```
 
-## Always add keys for list rendering
+Do not replace this with `h()` merely for abstraction consistency.
 
-**BAD:**
-```javascript
+## Programmatic List
+
+```js
 import { h, ref } from 'vue'
 
 export default {
-  setup() {
-    const items = ref([{ id: 1, name: 'Apple' }])
+    setup() {
+        const items = ref([
+            {
+                id: 1,
+                name: 'Apple'
+            }
+        ])
 
-    return () => h('ul',
-      items.value.map(item => h('li', item.name))
-    )
-  }
-}
-```
-
-**GOOD:**
-```javascript
-import { h, ref } from 'vue'
-
-export default {
-  setup() {
-    const items = ref([{ id: 1, name: 'Apple' }])
-
-    return () => h('ul',
-      items.value.map(item => h('li', { key: item.id }, item.name))
-    )
-  }
-}
-```
-
-## Use `withModifiers` / `withKeys` for event modifiers
-
-**BAD:**
-```javascript
-import { h } from 'vue'
-
-export default {
-  setup() {
-    const handleClick = (e) => {
-      e.stopPropagation()
-      e.preventDefault()
+        return () => {
+            return h(
+                'ul',
+                items.value.map((item) => {
+                    return h(
+                        'li',
+                        {
+                            key: item.id
+                        },
+                        item.name
+                    )
+                })
+            )
+        }
     }
-
-    return () => h('button', { onClick: handleClick }, 'Click')
-  }
 }
 ```
 
-**GOOD:**
-```javascript
-import { h, withModifiers, withKeys } from 'vue'
+## Explicit Model Contract
 
-export default {
-  setup() {
-    const handleClick = () => {}
-    const handleEnter = () => {}
+When rendering a component programmatically, wire its model contract explicitly.
 
-    return () => h('div', [
-      h('button', {
-        onClick: withModifiers(handleClick, ['stop', 'prevent'])
-      }, 'Click'),
-      h('input', {
-        onKeyup: withKeys(handleEnter, ['enter'])
-      })
-    ])
-  }
-}
-```
-
-## Implement `v-model` explicitly
-
-**BAD:**
-```javascript
-import { h, ref } from 'vue'
-import CustomInput from './CustomInput.vue'
-
-export default {
-  setup() {
-    const text = ref('')
-    return () => h(CustomInput, { modelValue: text.value })
-  }
-}
-```
-
-**GOOD:**
-```javascript
-import { h, ref } from 'vue'
-import CustomInput from './CustomInput.vue'
-
-export default {
-  setup() {
-    const text = ref('')
-    return () => h(CustomInput, {
-      modelValue: text.value,
-      'onUpdate:modelValue': (value) => { text.value = value }
+```js
+return () => {
+    return h(CustomInput, {
+        modelValue: text.value,
+        'onUpdate:modelValue': (value) => {
+            text.value = value
+        }
     })
-  }
 }
 ```
 
-## Use `withDirectives` for custom directives
+## Directives and Event Helpers
 
-**BAD:**
-```javascript
-import { h } from 'vue'
+If a render function truly needs directive/event-modifier behavior, use the corresponding Vue render helpers. Avoid manually reimplementing framework semantics when a built-in helper already exists.
 
-const vFocus = { mounted: (el) => el.focus() }
+## Stability Tier
 
-export default {
-  setup() {
-    return () => h('input', { 'v-focus': true })
-  }
-}
-```
+Render functions used in volatile business code should stay JavaScript unless the surrounding project/file is already TypeScript. A stable low-level Tier C renderer may use TypeScript when its VNode/public contract benefits from it.
 
-**GOOD:**
-```javascript
-import { h, withDirectives } from 'vue'
+## Platform Gate
 
-const vFocus = { mounted: (el) => el.focus() }
-
-export default {
-  setup() {
-    return () => withDirectives(h('input'), [[vFocus]])
-  }
-}
-```
-
-## Prefer functional components for stateless UI
-
-**BAD:**
-```javascript
-import { h } from 'vue'
-
-export default {
-  setup() {
-    return () => h('span', { class: 'badge' }, 'New')
-  }
-}
-```
-
-**GOOD:**
-```javascript
-import { h } from 'vue'
-
-function Badge(props, { slots }) {
-  return h('span', { class: 'badge' }, slots.default?.())
-}
-
-Badge.props = ['variant']
-
-export default Badge
-```
+For uni-app, load `uni-app-platform.md` first. Render functions are lower-level framework behavior and should not be assumed portable across all compiled targets without checking the project's/runtime's supported patterns.

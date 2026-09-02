@@ -1,48 +1,43 @@
 ---
 title: Single-File Component Structure, Styling, and Template Patterns
 impact: MEDIUM
-impactDescription: Consistent SFC structure, language selection, and styling choices improve maintainability, tooling support, and render performance
+impactDescription: Consistent SFC structure, appropriate language choice, and platform-aware template patterns improve maintainability
 type: best-practice
-tags: [vue3, sfc, javascript, typescript, jsdoc, scoped-css, styles, build-tools, performance, template, v-html, v-for, computed, v-if, v-show]
+tags: [vue3, sfc, javascript, typescript, jsdoc, scoped-css, styles, template, v-html, v-for, computed, v-if, v-show, uni-app]
 ---
 
 # Single-File Component Structure, Styling, and Template Patterns
 
-**Impact: MEDIUM** - Using SFCs with consistent structure, an appropriate script language, and performant styling keeps components easier to maintain and avoids unnecessary render overhead.
+Use Vue SFCs as the normal component format in build-based Vue projects. Keep language, styling, and platform assumptions aligned with the component's real responsibility.
 
 ## Task List
 
-- Use `.vue` SFCs instead of separate `.js`/`.ts` and `.css` files for components
-- Colocate template, script, and styles in the same SFC by default
-- Choose JS / JS + JSDoc / TS according to change frequency and contract stability; do not default every SFC to TypeScript
-- Use PascalCase for component names in templates and filenames
-- Prefer component-scoped styles
-- Prefer class selectors (not element selectors) in scoped CSS for performance
-- Access DOM / component refs with `useTemplateRef()` in Vue 3.5+
-- Use camelCase keys in `:style` bindings for consistency and IDE support
-- Use `v-for` and `v-if` correctly
-- Never use `v-html` with untrusted/user-provided content
-- Choose `v-if` vs `v-show` based on toggle frequency and initial render cost
+- Keep template, script, and component-local styles together in the SFC by default
+- Choose JS / JS + JSDoc / TS according to the main Skill's stability tiers
+- Use four-space indentation in all SFC sections
+- Use PascalCase component filenames and component tags unless the existing project has an explicit incompatible convention
+- Keep templates declarative and extract non-trivial derivation to script
+- Prefer component-scoped styling for application components
+- Prefer stable class-based or module-based style contracts for reusable foundation/library components when external override is expected
+- Use stable primitive keys in `v-for`
+- Avoid `v-if` and `v-for` on the same element
+- Never render untrusted HTML without an existing trusted sanitization boundary
+- Choose `v-if` vs `v-show` based on lifecycle and toggle behavior
+- Apply the uni-app platform gate before using DOM-specific assumptions
 
-## Choose the script language by stability
+## Choose Script Language by Stability
 
-Do not treat TypeScript as the universal default for Vue SFCs. Choose the script language according to the component's expected lifetime and rate of change.
-
-| Tier | Default | Typical components |
-| --- | --- | --- |
-| Business / volatile | JavaScript | pages, route views, forms, CRUD, dashboards, feature-specific components |
-| Shared / moderately stable | JavaScript + optional JSDoc | common components, shared feature-family components, evolving cross-page abstractions |
-| Foundation / stable contract | TypeScript | base UI, design-system primitives, stable reusable library components |
-
-For volatile business code, prefer:
+### Business / volatile
 
 ```vue
 <script setup>
-// frequently changing business logic
+const draft = ref('')
 </script>
 ```
 
-For moderately stable shared JavaScript, add JSDoc only when a boundary benefits from it:
+### Shared / moderately stable
+
+Use JavaScript and add JSDoc only where a shared boundary materially benefits from it.
 
 ```vue
 <script setup>
@@ -51,165 +46,118 @@ For moderately stable shared JavaScript, add JSDoc only when a boundary benefits
  */
 
 const props = defineProps({
-  options: {
-    type: Array,
-    required: true,
-  },
+    options: {
+        type: Array,
+        required: true
+    }
 })
 </script>
 ```
 
-For a stable foundation component with a mature public contract, TypeScript is appropriate:
+### Foundation / stable contract
 
 ```vue
 <script setup lang="ts">
 interface Props {
-  modelValue: string | number | null
-  disabled?: boolean
+    modelValue: string | number | null
+    disabled?: boolean
 }
 
 defineProps<Props>()
 </script>
 ```
 
-Do not convert an existing JavaScript SFC to TypeScript as a side effect of an unrelated change. Likewise, do not remove TypeScript from an existing TypeScript component without an explicit reason.
+Do not change a file's language as an incidental refactor.
 
-## Colocate template, script, and styles
-
-**BAD:**
-```
-components/
-├── UserCard.vue
-├── UserCard.js
-└── UserCard.css
-```
+## Keep SFC Concerns Colocated by Default
 
 **GOOD:**
+
 ```vue
-<!-- components/UserCard.vue -->
 <script setup>
 import { computed } from 'vue'
 
 const props = defineProps({
-  user: { type: Object, required: true }
+    user: {
+        type: Object,
+        required: true
+    }
 })
 
-const displayName = computed(() =>
-  `${props.user.firstName} ${props.user.lastName}`
-)
+const displayName = computed(() => {
+    return `${props.user.firstName} ${props.user.lastName}`
+})
 </script>
 
 <template>
-  <div class="user-card">
-    <h3 class="name">{{ displayName }}</h3>
-  </div>
+    <article class="user-card">
+        <h3 class="user-card__name">
+            {{ displayName }}
+        </h3>
+    </article>
 </template>
 
 <style scoped>
 .user-card {
-  padding: 1rem;
+    padding: 1rem;
 }
 
-.name {
-  margin: 0;
+.user-card__name {
+    margin: 0;
 }
 </style>
 ```
 
-## Use PascalCase for component names
+Separate files only when there is a concrete reason such as a shared stylesheet, generated code, or an intentionally reusable plain module.
 
-**BAD:**
-```vue
-<script setup>
-import userProfile from './user-profile.vue'
-</script>
+## Component Naming
 
-<template>
-  <user-profile :user="currentUser" />
-</template>
-```
+Prefer PascalCase for component filenames and imported component names.
 
-**GOOD:**
 ```vue
 <script setup>
 import UserProfile from './UserProfile.vue'
 </script>
 
 <template>
-  <UserProfile :user="currentUser" />
+    <UserProfile :user="currentUser" />
 </template>
 ```
 
-## Best practices for `<style>` block in SFCs
+Do not rename an established component tree solely to enforce naming during an unrelated maintenance task.
 
-### Prefer component-scoped styles
+## Styling Strategy Follows Component Responsibility
 
-- Use `<style scoped>` for styles that belong to a component.
-- Keep **global CSS** in a dedicated file (e.g. `src/assets/main.css`) for resets, typography, tokens, etc.
-- Use `:deep()` sparingly (edge cases only).
+### Application/business components
 
-**BAD:**
-
-```vue
-<style>
-/* ❌ leaks everywhere */
-button { border-radius: 999px; }
-</style>
-```
-
-**GOOD:**
+Component-scoped styling is a good default when styles are local implementation details.
 
 ```vue
 <style scoped>
-.button { border-radius: 999px; }
+.profile-card {
+    display: grid;
+    gap: 1rem;
+}
 </style>
 ```
 
-**GOOD:**
+Prefer class selectors over broad element selectors in scoped styles.
 
-```css
-/* src/assets/main.css */
-/* ✅ resets, tokens, typography, app-wide rules */
-:root { --radius: 999px; }
-```
+### Foundation/library-style components
 
-### Use class selectors in scoped CSS
+When a broadly reused component intentionally exposes styling hooks to consumers, prefer the project's established stable class convention, CSS modules, design tokens, or another explicit style contract instead of assuming `<style scoped>` is always best.
 
-**BAD:**
-```vue
-<template>
-  <article>
-    <h1>{{ title }}</h1>
-    <p>{{ subtitle }}</p>
-  </article>
-</template>
+The goal is predictable override behavior, not one universal CSS mechanism.
 
-<style scoped>
-article { max-width: 800px; }
-h1 { font-size: 2rem; }
-p { line-height: 1.6; }
-</style>
-```
+### Global styles
 
-**GOOD:**
-```vue
-<template>
-  <article class="article">
-    <h1 class="article-title">{{ title }}</h1>
-    <p class="article-subtitle">{{ subtitle }}</p>
-  </article>
-</template>
+Keep resets, application-wide tokens, typography foundations, and truly global rules in the project's established global style entry.
 
-<style scoped>
-.article { max-width: 800px; }
-.article-title { font-size: 2rem; }
-.article-subtitle { line-height: 1.6; }
-</style>
-```
+Do not create a new styling dependency because an example mentions a technique.
 
-## Access DOM / component refs with `useTemplateRef()`
+## Template Refs Are Platform-Sensitive
 
-For Vue 3.5+: use `useTemplateRef()` to access template refs. Do not enable TypeScript solely for this API.
+On browser Vue 3.5+, `useTemplateRef()` is a clear way to access template refs.
 
 ```vue
 <script setup>
@@ -218,153 +166,122 @@ import { onMounted, useTemplateRef } from 'vue'
 const inputRef = useTemplateRef('input')
 
 onMounted(() => {
-  inputRef.value?.focus()
+    inputRef.value?.focus()
 })
 </script>
 
 <template>
-  <input ref="input" />
+    <input ref="input" />
 </template>
 ```
 
-In a Tier C TypeScript component, add the element type when it improves the stable public/internal contract:
+This is a **browser DOM example**. In uni-app non-H5 targets, refs can expose different objects/capabilities. Load `uni-app-platform.md` before using DOM methods such as `focus()`, `getBoundingClientRect()`, or direct element mutation.
 
-```ts
-const inputRef = useTemplateRef<HTMLInputElement>('input')
-```
+Do not enable TypeScript solely for a template ref.
 
-## Use camelCase in `:style` bindings
+## Keep Style Bindings Readable
 
-**BAD:**
+Use camelCase property keys in object-style bindings unless the existing codebase has another clear convention.
+
 ```vue
 <template>
-  <div :style="{ 'font-size': fontSize + 'px', 'background-color': bg }">
-    Content
-  </div>
+    <div :style="{ fontSize: fontSize + 'px', backgroundColor: background }">
+        Content
+    </div>
 </template>
 ```
 
-**GOOD:**
+If a style expression becomes large or is reused, move it to a computed value. Do not extract trivial one-off bindings only to satisfy abstraction rules.
+
+## Use Stable Keys in `v-for`
+
+Prefer stable primitive IDs or other stable primitive values.
+
 ```vue
 <template>
-  <div :style="{ fontSize: fontSize + 'px', backgroundColor: bg }">
-    Content
-  </div>
+    <li
+        v-for="item in items"
+        :key="item.id"
+    >
+        {{ item.name }}
+    </li>
 </template>
 ```
 
-## Use `v-for` and `v-if` correctly
+Avoid using object identity or an unstable/random value as the key.
 
-### Always provide a stable `:key`
+## Avoid `v-if` and `v-for` on the Same Element
 
-- Prefer primitive keys (`string | number`).
-- Avoid using objects as keys.
-
-**GOOD:**
-
-```vue
-<li v-for="item in items" :key="item.id">
-  <input v-model="item.text" />
-</li>
-```
-
-### Avoid `v-if` and `v-for` on the same element
-
-It leads to unclear intent and unnecessary work.
-([Reference](https://vuejs.org/guide/essentials/list.html#v-for-with-v-if))
-
-**To filter items**
-**BAD:**
-
-```vue
-<li v-for="user in users" v-if="user.active" :key="user.id">
-  {{ user.name }}
-</li>
-```
-
-**GOOD:**
+For filtered lists, derive the list first when filtering is non-trivial.
 
 ```vue
 <script setup>
 import { computed } from 'vue'
 
-const activeUsers = computed(() => users.value.filter(u => u.active))
+const activeUsers = computed(() => {
+    return users.value.filter((user) => user.active)
+})
 </script>
 
 <template>
-  <li v-for="user in activeUsers" :key="user.id">
-    {{ user.name }}
-  </li>
+    <li
+        v-for="user in activeUsers"
+        :key="user.id"
+    >
+        {{ user.name }}
+    </li>
 </template>
 ```
 
-**To conditionally show/hide the entire list**
-**GOOD:**
+To conditionally show the entire list, place the condition on a parent/container instead.
 
-```vue
-<ul v-if="shouldShowUsers">
-  <li v-for="user in users" :key="user.id">
-    {{ user.name }}
-  </li>
-</ul>
-```
+## Treat `v-html` as a Trust Boundary
 
-## Never render untrusted HTML with `v-html`
+Never put untrusted/user-controlled HTML directly into `v-html`.
 
-**BAD:**
+Prefer escaped interpolation whenever rich HTML is not required:
+
 ```vue
 <template>
-  <!-- DANGEROUS: untrusted input can inject scripts -->
-  <article v-html="userProvidedContent"></article>
+    <p>{{ userProvidedText }}</p>
 </template>
 ```
 
-**GOOD:**
+If rich HTML is required, pass it through a **sanitization mechanism that already exists in the project** or a deliberately reviewed security boundary before rendering it.
+
 ```vue
 <script setup>
 import { computed } from 'vue'
-import DOMPurify from 'dompurify'
+import { sanitizeTrustedHtml } from '@/security/html'
 
 const props = defineProps({
-  trustedHtml: String,
-  plainText: {
-    type: String,
-    required: true,
-  },
+    html: {
+        type: String,
+        required: true
+    }
 })
 
-const safeHtml = computed(() => DOMPurify.sanitize(props.trustedHtml ?? ''))
+const safeHtml = computed(() => {
+    return sanitizeTrustedHtml(props.html)
+})
 </script>
 
 <template>
-  <!-- Preferred: escaped interpolation -->
-  <p>{{ props.plainText }}</p>
-
-  <!-- Only for trusted/sanitized HTML -->
-  <article v-html="safeHtml"></article>
+    <article v-html="safeHtml" />
 </template>
 ```
 
-## Choose `v-if` vs `v-show` by toggle behavior
+`sanitizeTrustedHtml` is a project-owned abstraction placeholder, **not a recommendation to install a package**. If no reviewed sanitizer exists and rich HTML is not an explicit requirement, do not invent one or add a dependency as an incidental change.
 
-**BAD:**
+## Choose `v-if` vs `v-show` by Behavior
+
+Use `v-show` when content is mounted safely and toggles frequently. Use `v-if` when conditional content is infrequent, expensive to mount initially, or should not exist while inactive.
+
 ```vue
 <template>
-  <!-- Frequent toggles with v-if cause repeated mount/unmount -->
-  <ComplexPanel v-if="isPanelOpen" />
-
-  <!-- Rarely shown content with v-show pays initial render cost -->
-  <AdminPanel v-show="isAdmin" />
+    <FrequentlyToggledPanel v-show="isPanelOpen" />
+    <RareAdminPanel v-if="isAdmin" />
 </template>
 ```
 
-**GOOD:**
-```vue
-<template>
-  <!-- Frequent toggles: keep in DOM, toggle display -->
-  <ComplexPanel v-show="isPanelOpen" />
-
-  <!-- Rare condition: lazy render only when true -->
-  <AdminPanel v-if="isAdmin" />
-</template>
-```
+This is a heuristic, not a reason to refactor working code without a measured or maintainability benefit.

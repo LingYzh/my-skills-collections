@@ -1,280 +1,294 @@
 ---
 name: vue-best-practices
-description: MUST be used for Vue.js tasks. Strongly recommends Vue 3 Composition API with `<script setup>` as the standard approach. Choose JavaScript or TypeScript by code stability and reuse scope: JavaScript for volatile business code, JavaScript with optional JSDoc for moderately stable shared code, and TypeScript for stable contract-heavy foundation code. Uses mandatory four-space indentation, prefers Promise chaining plus UI loading locks for async API/interface calls, and applies uni-app-specific loading/toast ordering. Covers Vue 3, SSR, Volar, vue-tsc. Load for any Vue, .vue files, Vue Router, Pinia, Vite with Vue, or uni-app Vue work. ALWAYS use Composition API unless the project explicitly requires Options API.
+description: MUST be used for Vue.js and uni-app Vue tasks. Defaults to Vue 3 Composition API with `<script setup>` for new code while respecting existing project architecture. Chooses JavaScript, optional JSDoc, or TypeScript by code stability; enforces four-space indentation; uses task-scoped reference loading; avoids incidental dependencies/refactors; and applies explicit uni-app platform gates plus async UI loading locks.
 license: MIT
 metadata:
     author: github.com/vuejs-ai
     customized_by: github.com/LingYzh
     upstream_version: "18.0.0"
-    version: "18.3.0-personal.3"
+    version: "18.4.0-personal.4"
 ---
 
 # Vue Best Practices Workflow
 
-Use this skill as an instruction set. Follow the workflow in order unless the user explicitly asks for a different order.
+Use this Skill as a decision framework, not as permission to rewrite unrelated project architecture.
 
 ## Core Principles
-- **Keep state predictable:** one source of truth, derive everything else.
-- **Make data flow explicit:** Props down, Events up for most cases.
-- **Favor small, focused components:** easier to test, reuse, and maintain.
-- **Avoid unnecessary re-renders:** use computed properties and watchers wisely.
-- **Readability counts:** write clear, self-documenting code.
-- **Language follows stability:** do not default all Vue code to TypeScript; choose JS, JS + JSDoc, or TS according to expected change frequency, reuse scope, API stability, and the cost of breaking consumers.
-- **Four-space indentation is mandatory:** use four ASCII spaces per indentation level in all authored or edited code; never use tabs for indentation.
-- **Async UI must be guarded:** prefer Promise chaining for API/interface calls and lock conflicting UI actions while the request is pending.
-- **Platform lifecycle rules override generic cleanup placement:** for uni-app loading + toast flows, hide the native loading prompt before showing the toast; keep only the application-level lock cleanup in `finally()`.
 
-## 1) Confirm architecture before coding (required)
+- **Respect the task boundary:** solve the requested problem before pursuing cleanup or architecture changes.
+- **Respect existing architecture:** do not migrate working patterns incidentally.
+- **Language follows stability:** JS for volatile business code, JS + optional JSDoc for moderately stable shared code, TS for stable contract-heavy foundation code.
+- **Four-space indentation is mandatory:** normalize every edited hand-maintained code/config file to four ASCII spaces.
+- **Prefer locality for volatile business code:** extraction is useful only when it creates a meaningful responsibility/reuse/lifecycle boundary.
+- **Keep state ownership predictable:** minimize duplicated source state and derive values when practical.
+- **Make data flow understandable:** use the simplest communication mechanism that keeps ownership clear.
+- **Platform comes before Web assumptions:** uni-app targets must pass the platform compatibility gate before browser-oriented Vue guidance is applied.
+- **Async UI must be guarded:** user-triggered requests need operation-level loading/interaction locks.
+- **Dependencies are explicit architecture decisions:** examples are never authorization to install third-party packages.
+- **Performance is evidence-driven:** optimize measured hot paths, not magic thresholds from examples.
 
-- Default framework style: Vue 3 + Composition API + `<script setup>`.
-- Do **not** assume `<script setup lang="ts">` is the default.
-- Respect the existing project's local language conventions when editing existing code, except for the mandatory four-space indentation policy in section `1.2`.
-- If the project explicitly uses Options API, load `vue-options-api-best-practices` skill if available.
-- If the project explicitly uses JSX, load `vue-jsx-best-practices` skill if available.
+## 1. Confirm Context Before Coding
 
-### 1.1 Choose the language tier before creating or substantially rewriting code (required)
+For a small localized edit, keep this quick. For a new feature or multi-file change, inspect enough surrounding code to understand the existing pattern.
 
-Classify the code by expected stability and responsibility before choosing JavaScript or TypeScript.
+Determine:
 
-#### Tier A — Business / volatile: default to JavaScript
+1. Vue version / relevant runtime constraints when they affect the task.
+2. Whether this is normal Web Vue, SSR, uni-app H5, uni-app App, mini program, or another compiled target.
+3. Existing API style: Composition API / Options API / JSX where relevant.
+4. Existing language and formatting conventions in the files being edited.
+5. Existing project utilities, stores, request wrappers, UI/loading patterns, and dependencies that should be reused.
 
-Use plain JavaScript for code that is expected to change frequently with product requirements:
+### Existing architecture beats incidental migration
 
-- pages and route views
-- CRUD, forms, dashboards, admin/business pages
+- New Vue 3 code defaults to Composition API + `<script setup>`.
+- If an existing component uses Options API, **do not migrate it to Composition API as part of an unrelated edit**.
+- Do not migrate JSX/templates, state-management patterns, router patterns, styling systems, JS/TS, or dependency choices incidentally.
+- Architecture migration should be an explicit task with a concrete benefit.
+
+## 1.1 Choose the Language Tier
+
+### Tier A — Business / volatile: JavaScript
+
+Default to plain JavaScript for frequently changing product code:
+
+- pages / route views
+- CRUD, forms, dashboards, admin/business screens
 - feature-specific components
 - feature-specific composables
-- business orchestration / glue code
-- prototypes and rapidly evolving features
-
-Default SFC form:
+- orchestration / glue code
+- prototypes and rapidly evolving requirements
 
 ```vue
 <script setup>
-// business logic
+// volatile business logic
 </script>
 ```
 
-The primary optimization goal here is low editing friction and easy maintenance during frequent requirement changes.
+### Tier B — Shared / moderately stable: JavaScript + optional JSDoc
 
-#### Tier B — Shared / moderately stable: default to JavaScript + optional JSDoc
+Use JavaScript for shared code that still changes regularly. Add JSDoc only where a non-obvious shared contract benefits from editor help.
 
-Use JavaScript for shared code that is reused across multiple features but still evolves regularly. Add JSDoc only at boundaries where it materially improves editor hints or clarifies a non-obvious contract.
+Do not imitate TypeScript by annotating every local variable/function.
 
-Typical examples:
+### Tier C — Foundation / stable contract: TypeScript
 
-- shared components used by several pages
-- common but still evolving composables
-- shared utilities
-- feature-family abstractions
+Prefer TypeScript for low-change, broadly reused, contract-heavy code such as stable base UI/design-system primitives, mature shared modules, and library-like composables.
 
-Do not add JSDoc to every local variable or obvious function merely to imitate TypeScript syntax.
+### Language decision order
 
-#### Tier C — Foundation / stable contract: prefer TypeScript
-
-Use TypeScript when code is low-change, broadly reused, and has a stable public contract where breaking consumers is costly.
-
-Typical examples:
-
-- base / UI-library components
-- stable design-system primitives
-- library-like shared composables
-- infrastructure wrappers
-- long-lived reusable modules with important props/emits/slots or generic contracts
-
-TypeScript is valuable here because the interface is expected to stay stable enough for the type maintenance cost to pay back over many consumers.
-
-#### Language decision rules
-
-Use these signals in order:
-
-1. Existing local convention in the file/module being edited.
+1. Existing language in the file/module being edited.
 2. Expected change frequency.
-3. Reuse scope and number of consumers.
-4. API/contract stability.
-5. Cost of breaking downstream consumers.
+3. Reuse scope / number of consumers.
+4. Contract stability.
+5. Cost of breaking consumers.
 
-Additional rules:
+Rules:
 
-- When uncertain for **new business code**, choose JavaScript.
-- Do **not** migrate JavaScript to TypeScript as an incidental refactor.
-- Do **not** migrate TypeScript to JavaScript incidentally either; language migration must be an explicit task or have a concrete technical reason.
-- A file becoming reusable once is not enough reason to convert it to TypeScript.
-- TypeScript availability in the project is not, by itself, a reason to use it for every new file.
-- Explicit project requirements or user instructions override this tier policy.
+- New uncertain business code -> choose JavaScript.
+- Do not migrate JS -> TS or TS -> JS incidentally.
+- A second consumer is not sufficient reason to convert code to TypeScript.
+- TypeScript being installed is not a reason to use it for every file.
+- Explicit user/project requirements override this tier policy.
 
-### 1.2 Mandatory formatting policy (required)
+## 1.2 Mandatory Four-Space Formatting
 
-Use **four ASCII spaces per indentation level** in all code you create or edit.
+Use **four ASCII spaces per indentation level** in every hand-maintained code/config file you create or edit.
 
-- Apply four-space indentation consistently to Vue templates, `<script>`, `<style>`, JavaScript, TypeScript, JSON, YAML, CSS, and other hand-maintained source/config files.
+Applies to Vue template/script/style, JavaScript, TypeScript, JSON, YAML, CSS, and similar files.
+
 - Never use tabs for indentation.
-- When editing a pre-existing file that uses 2-space or mixed indentation, normalize the **entire edited file** to four-space indentation before finishing. Do not leave mixed indentation behind.
-- Formatting cleanup caused by this rule is intentional and belongs in the same task/patch.
-- Do not reformat generated, vendored, minified, lock, or machine-managed files unless the task explicitly requires editing them.
-- This personal formatting rule overrides indentation shown in upstream examples or the surrounding project when a hand-maintained source/config file is edited.
+- When editing a legacy 2-space/mixed-indentation file, normalize the **entire edited file** to four spaces.
+- Do not reformat generated, vendored, minified, lock, or machine-managed files unless the task explicitly requires it.
+- This policy intentionally overrides upstream examples and an existing 2-space convention for hand-maintained files that are edited under this Skill.
 
-#### Keep formatter/linter/editor configuration aligned to four spaces
+Keep project-controlled formatting tools aligned when they would otherwise revert edited source:
 
-Do not allow project tooling to silently restore 2-space or tab indentation after code has been normalized.
+- EditorConfig: `indent_style = space`, `indent_size = 4`
+- Prettier: `tabWidth: 4`, `useTabs: false`
+- ESLint / Vue indentation rules: configure the applicable indentation width to `4`
+- If one formatter is authoritative, disable conflicting formatting rules instead of making tools fight each other
 
-- If an editable project-controlled formatter/editor/linter configuration conflicts with this policy, update the relevant indentation setting to four spaces when necessary to keep edited source stable.
-- For EditorConfig, use `indent_style = space` and `indent_size = 4` for hand-maintained source/config files.
-- For Prettier, use `tabWidth: 4` and `useTabs: false`.
-- For ESLint / eslint-plugin-vue indentation rules, configure the applicable JavaScript, Vue `<template>`, and Vue `<script>` indentation width to `4`.
-- If Prettier is the authoritative formatter, avoid maintaining conflicting ESLint formatting rules; configure Prettier to four spaces and disable conflicting indentation rules instead of letting two tools fight each other.
-- Do not preserve a project-level `2` merely because it existed before if it controls files being actively edited under this personal Skill.
+## 1.3 Global Dependency Discipline
 
-### 1.3 Must-read core references (required)
+This generic Skill should be **dependency-neutral**.
 
-- Before implementing any Vue task, make sure to read and apply these core references:
-    - `references/reactivity.md`
-    - `references/sfc.md`
-    - `references/component-data-flow.md`
-    - `references/composables.md`
-- Keep these references in active working context for the entire task, not only when a specific issue appears.
+- Do not install, replace, or migrate to a third-party package merely because a reference/example mentions a capability.
+- Prefer native Vue/platform capabilities and dependencies/utilities already present in the project.
+- If the project already uses a third-party library, maintain it according to the project's established conventions; do not promote that library into a generic recommendation.
+- If a new dependency is genuinely required, make it an explicit architectural change with a concrete reason and user/task justification.
+- Third-party-specific best practices belong in a dedicated Skill or project documentation, not in this generic Vue Skill.
+- Placeholder names such as `ProjectVirtualList` or `sanitizeTrustedHtml` represent existing/project-owned abstractions, not packages to install.
 
-### 1.4 Plan component boundaries before coding (required)
+## 1.4 Load References by Task — Do Not Preload Everything
 
-Create a brief component map before implementation for any non-trivial feature.
+Do **not** load all core references for every Vue task. Load only the references that materially affect the current work.
 
-- Define each component's single responsibility in one sentence.
-- Keep entry/root and route-level view components as composition surfaces by default.
-- Move feature UI and feature logic out of entry/root/view components unless the task is intentionally a tiny single-file demo.
-- Define props/emits contracts for each child component in the map.
-- Prefer a feature folder layout (`components/<feature>/...`, `composables/use<Feature>.js`) for volatile business features; use `.ts` for the composable when it clearly belongs to Tier C or the existing project convention requires it.
+### Common routing
 
-## 2) Apply essential Vue foundations (required)
+- reactive state / computed / watch -> `references/reactivity.md`
+- SFC/template/style / refs / `v-if` / `v-for` / `v-html` -> `references/sfc.md`
+- props / emits / `v-model` / provide/inject / component refs -> `references/component-data-flow.md`
+- composable design/extraction -> `references/composables.md`
+- UI-triggered API/interface request -> `references/async-interface-ui.md`
+- shared/global state architecture -> `references/state-management.md`
+- uni-app task or platform-sensitive Vue API in uni-app -> **always first** `references/uni-app-platform.md`
 
-These are essential, must-know foundations. Apply all of them in every Vue task using the core references already loaded in section `1.3`.
+### When to load multiple references
+
+Load several references when the task genuinely spans several concerns, such as creating a new feature with state, child components, async requests, and composables.
+
+For a tiny edit (text, one condition, one CSS fix), do not consume unrelated references.
+
+Keep only currently relevant references in active working context.
+
+## 1.5 Plan Component Boundaries Only When the Change Needs It
+
+For a simple/local edit, do not produce a component architecture exercise.
+
+For a new non-trivial feature or a change spanning multiple components, briefly identify responsibilities and communication boundaries before implementation.
+
+### Split components when a meaningful boundary exists
+
+Good split signals:
+
+- an independently meaningful/reusable UI or behavior unit
+- a distinct lifecycle/side-effect boundary
+- state ownership becomes clearer in a child
+- a stable public component contract exists
+- a section has enough independent complexity that isolation reduces maintenance cost
+- the same meaningful block is reused
+
+### Do not split based on arbitrary thresholds
+
+Do **not** require splitting because:
+
+- a component has 3+ visual sections
+- a file passed a line count
+- a CRUD page “should” have container/form/list/footer components
+- a template block could theoretically be reusable someday
+- a route view is assumed to be only a thin composition shell
+
+A cohesive business page may intentionally keep related volatile logic/UI together when that makes frequent changes easier.
+
+Do not turn one maintainable feature into many one-use files without a clear boundary.
+
+## 2. Apply Relevant Vue Foundations
 
 ### Reactivity
 
-- Must-read reference from `1.3`: [reactivity](references/reactivity.md)
-- Keep source state minimal (`ref`/`reactive`), derive everything possible with `computed`.
-- Use watchers for side effects if needed.
-- Avoid recomputing expensive logic in templates.
+When reactive choices matter, load `references/reactivity.md`.
 
-### SFC structure and template safety
+- `ref()` is the normal primitive/default ref.
+- `shallowRef()` is for intentionally shallow/opaque/large root-replacement state, not a primitive micro-optimization.
+- Prefer `computed()` for meaningful derived state.
+- Keep computed getters pure.
+- Use watchers for side effects/synchronization.
 
-- Must-read reference from `1.3`: [sfc](references/sfc.md)
-- Keep SFC sections in this order: `<script>` → `<template>` → `<style>`.
-- Apply the language tier from section `1.1` when choosing `<script setup>` vs `<script setup lang="ts">`.
-- Apply four-space indentation from section `1.2` to the entire edited SFC, including template, script, and style blocks.
-- Keep SFC responsibilities focused; split large components.
-- Keep templates declarative; move branching/derivation to script.
-- Apply Vue template safety rules (`v-html`, list rendering, conditional rendering choices).
+### SFC / template / styling
 
-### Keep components focused
+When template/SFC structure matters, load `references/sfc.md`.
 
-Split a component when it has **more than one clear responsibility** (e.g. data orchestration + UI, or multiple independent UI sections).
-
-- Prefer **smaller components + composables** over one “mega component”.
-- Move **UI sections** into child components (props in, events out).
-- Move **state/side effects** into composables (`useXxx()`).
-
-Apply objective split triggers. Split the component if **any** condition is true:
-
-- It owns both orchestration/state and substantial presentational markup for multiple sections.
-- It has 3+ distinct UI sections (for example: form, filters, list, footer/status).
-- A template block is repeated or could become reusable (item rows, cards, list entries).
-
-Entry/root and route view rule:
-
-- Keep entry/root and route view components thin: app shell/layout, provider wiring, and feature composition.
-- Do not place full feature implementations in entry/root/view components when those features contain independent parts.
-- For CRUD/list features (todo, table, catalog, inbox), split at least into:
-    - feature container component
-    - input/form component
-    - list (and/or item) component
-    - footer/actions or filter/status component
-- Allow a single-file implementation only for very small throwaway demos; if chosen, explicitly justify why splitting is unnecessary.
+- Keep SFC sections readable and use four-space indentation.
+- Apply the JS/JSDoc/TS tier.
+- Treat `v-html` as a trust boundary.
+- Application components can prefer scoped/local styles; stable foundation/library components may expose class/module/token style contracts according to the project.
+- DOM-oriented examples are browser guidance, not universal uni-app guidance.
 
 ### Component data flow
 
-- Must-read reference from `1.3`: [component-data-flow](references/component-data-flow.md)
-- Use props down, events up as the primary model.
-- Use `v-model` only for true two-way component contracts.
-- Use provide/inject only for deep-tree dependencies or shared context.
-- Keep contracts explicit using runtime props/emits in JavaScript, optional JSDoc for Tier B shared code, and type-based `defineProps` / `defineEmits` / `InjectionKey` when TypeScript is appropriate for Tier C.
+When component communication matters, load `references/component-data-flow.md`.
+
+- Props/events are the ordinary parent-child default.
+- `v-model` is for intentional two-way contracts.
+- Provide/inject is chosen by contextual ownership / pass-through pain, **not by a fixed component-depth number**.
+- Component refs are for genuine imperative APIs.
 
 ### Composables
 
-- Must-read reference from `1.3`: [composables](references/composables.md)
-- Extract logic into composables when it is reused, stateful, or side-effect heavy.
-- Keep composable APIs small and predictable.
-- Use JavaScript for volatile feature composables, JavaScript + optional JSDoc for moderately stable shared composables, and TypeScript for stable library-like composables.
-- Do not introduce TypeScript solely for editor hints when JSDoc or runtime contracts are sufficient.
-- Separate feature logic from presentational components.
+When extraction/design matters, load `references/composables.md`.
 
-### Async API/interface calls and UI loading locks
+- Reuse/coherent responsibility/lifecycle are good extraction reasons.
+- File length, ref count, or “clean architecture” aesthetics alone are not.
+- Prefer locality for volatile one-off business workflows when extraction would increase navigation cost.
 
-When a Vue UI triggers an asynchronous API/interface request, load and apply [async-interface-ui](references/async-interface-ui.md).
+### Async API/interface calls
 
-- Prefer Promise chaining (`.then().catch().finally()`) for API/interface calls by default.
-- Use `async` / `await` only when chaining would make the control flow materially harder to read or when an external API requires it.
-- Set an operation-specific loading state before starting the request.
-- Guard handlers against duplicate invocation while loading.
-- Block duplicate or conflicting user actions while the request is pending.
-- Reflect the lock in the UI with `disabled`, loading indicators, or equivalent interaction guards.
-- Release the **application-level reactive/business lock** in `.finally()` so both success and failure paths restore interaction state.
-- Keep unrelated UI usable when it is safe; prefer operation-scoped locks over freezing the whole page.
-- In uni-app, if `uni.showLoading()` is followed by `uni.showToast()`, call `uni.hideLoading()` **before** the toast in each success/failure path. Do not put the only `uni.hideLoading()` after the toast in `.finally()` because the shared prompt layer can cause the toast to be closed or suppressed.
-- For uni-app, `.finally()` should normally restore the reactive/business lock (`isLoading`, `isSubmitting`, etc.); native prompt teardown follows the required platform order described in the reference.
+When UI triggers an asynchronous request, load `references/async-interface-ui.md`.
 
-## 3) Consider optional features only when requirements call for them
+- Prefer `.then().catch().finally()` for ordinary interface/API request flow.
+- Guard duplicate handler entry.
+- Lock conflicting UI while pending.
+- Keep unrelated UI available when safe.
+- Release application-level reactive/business locks in `.finally()`.
+- In uni-app, native loading/toast ordering follows the platform-specific rule in that reference.
 
-### 3.1 Standard optional features
+### uni-app
 
-Do not add these by default. Load the matching reference only when the requirement exists.
+For **every uni-app task**, load `references/uni-app-platform.md` before browser-oriented optional references.
 
-- Slots: parent needs to control child content/layout -> [component-slots](references/component-slots.md)
-- Fallthrough attributes: wrapper/base components must forward attrs/events safely -> [component-fallthrough-attrs](references/component-fallthrough-attrs.md)
-- Built-in component `<KeepAlive>` for stateful view caching -> [component-keep-alive](references/component-keep-alive.md)
-- Built-in component `<Teleport>` for overlays/portals -> [component-teleport](references/component-teleport.md)
-- Built-in component `<Suspense>` for async subtree fallback boundaries -> [component-suspense](references/component-suspense.md)
-- Animation-related features: pick the simplest approach that matches the required motion behavior.
-    - Built-in component `<Transition>` for enter/leave effects -> [transition](references/component-transition.md)
-    - Built-in component `<TransitionGroup>` for animated list mutations -> [transition-group](references/component-transition-group.md)
-    - Class-based animation for non-enter/leave effects -> [animation-class-based-technique](references/animation-class-based-technique.md)
-    - State-driven animation for user-input-driven animation -> [animation-state-driven-technique](references/animation-state-driven-technique.md)
+- Identify actual target(s).
+- Do not assume browser DOM outside H5.
+- Do not introduce ordinary Vue Router/`RouterView` architecture into normal uni-app page routing.
+- Gate Vue built-ins and refs by target compatibility.
+- Platform compatibility overrides generic Web Vue references.
 
-### 3.2 Less-common optional features
+## 3. Optional Features — Load Only When Required
 
-Use these only when there is explicit product or technical need.
+### Common optional features
 
-- Directives: behavior is DOM-specific and not a good composable/component fit -> [directives](references/directives.md)
-- Async components: heavy/rarely-used UI should be lazy loaded -> [component-async](references/component-async.md)
-- Render functions only when templates cannot express the requirement -> [render-functions](references/render-functions.md)
-- Plugins when behavior must be installed app-wide -> [plugins](references/plugins.md)
-- State management patterns: app-wide shared state crosses feature boundaries -> [state-management](references/state-management.md)
+- Slots -> `references/component-slots.md`
+- Fallthrough attrs -> `references/component-fallthrough-attrs.md`
+- KeepAlive -> `references/component-keep-alive.md` (platform gate in uni-app)
+- Teleport -> `references/component-teleport.md` (platform gate in uni-app)
+- Transition -> `references/component-transition.md` (platform gate in uni-app)
+- TransitionGroup -> `references/component-transition-group.md` (platform gate in uni-app)
+- Class/state-driven animation -> matching animation reference
 
-## 4) Run performance optimization after behavior is correct
+### Less-common / architecture-sensitive
 
-Performance work is a post-functionality pass. Do not optimize before core behavior is implemented and verified.
+- Directives -> `references/directives.md`
+- Async components -> `references/component-async.md`
+- Render functions -> `references/render-functions.md`
+- Plugins -> `references/plugins.md`
+- State management -> `references/state-management.md`
 
-- Large list rendering bottlenecks -> [perf-virtualize-large-lists](references/perf-virtualize-large-lists.md)
-- Static subtrees re-rendering unnecessarily -> [perf-v-once-v-memo-directives](references/perf-v-once-v-memo-directives.md)
-- Over-abstraction in hot list paths -> [perf-avoid-component-abstraction-in-lists](references/perf-avoid-component-abstraction-in-lists.md)
-- Expensive updates triggered too often -> [updated-hook-performance](references/updated-hook-performance.md)
+### Experimental
 
-## 5) Final self-check before finishing
+- Suspense -> `references/component-suspense.md`
 
-- Core behavior works and matches requirements.
-- All must-read references were read and applied.
-- The chosen JS/JSDoc/TS tier matches the code's stability and responsibility.
-- No incidental JavaScript ↔ TypeScript migration was introduced.
-- Every edited hand-maintained code/config file uses four-space indentation consistently.
-- Project-controlled formatter/linter/editor indentation settings do not undo the mandatory four-space policy for edited source.
-- Reactivity model is minimal and predictable.
-- SFC structure and template rules are followed.
-- Components are focused and well-factored, splitting when needed.
-- Entry/root and route view components remain composition surfaces unless there is an explicit small-demo exception.
-- Component split decisions are explicit and defensible (responsibility boundaries are clear).
-- Data flow contracts are explicit and expressed appropriately for the selected language tier.
-- Composables are used where reuse/complexity justifies them.
-- Moved state/side effects into composables if applicable.
-- Async API/interface calls prefer Promise chaining and have a correct loading/interaction lock when they can be triggered from the UI.
-- uni-app flows that combine `uni.showLoading()` and `uni.showToast()` hide the loading prompt before showing the toast; `finally()` only handles the application-level lock unless no toast ordering constraint exists.
-- Optional features are used only when requirements demand them.
-- Performance changes were applied only after functionality was complete.
+Do not introduce Suspense by default; it remains an experimental Vue feature and requires explicit architectural intent plus platform compatibility.
+
+## 4. Performance Comes After Correctness and Evidence
+
+Do not optimize based on generic thresholds.
+
+- very large/expensive mounted list -> `references/perf-virtualize-large-lists.md`
+- known static subtree update issue -> `references/perf-v-once-v-memo-directives.md`
+- measured list component-overhead hot path -> `references/perf-avoid-component-abstraction-in-lists.md`
+- expensive update hook -> `references/updated-hook-performance.md`
+
+Rules:
+
+- reproduce/measure the problem first when practical
+- do not use arbitrary “N items” or “N components” cutoffs from examples
+- do not install a performance package automatically
+- preserve maintainability unless measurement shows the abstraction is materially costly
+
+## 5. Final Self-Check
+
+Before finishing, verify only what is relevant to the task:
+
+- requested behavior is correct
+- no unrelated architecture/language/dependency migration was introduced
+- edited hand-maintained files use four-space indentation consistently
+- formatter/linter/editor settings will not immediately undo the indentation rule
+- selected references matched the actual task instead of being loaded mechanically
+- reactive primitives are appropriate (`ref()` is not replaced by `shallowRef()` without reason)
+- component/composable splitting has a real responsibility/reuse/lifecycle benefit
+- data ownership/communication is understandable
+- UI-triggered async operations have correct loading/interaction locks
+- uni-app platform-sensitive code passed the platform gate
+- no third-party dependency was added merely because a Skill example suggested a capability
+- experimental/optional Vue features were introduced only with explicit need
+- performance work is supported by a real requirement or measured bottleneck
