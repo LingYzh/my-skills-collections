@@ -13,7 +13,7 @@
 | Skill | 用途 | Local | Upstream | 同步状态 | 本地状态 |
 | --- | --- | --- | --- | --- | --- |
 | [`vue-best-practices`](./skills/vue-best-practices/) | Vue 3 / Composition API / uni-app Vue 开发实践 | **v18.6.0-personal.6** | **v18.0.0** | 🔵 **Customized** | ✅ **Active** |
-| [`grilling`](./skills/grilling/) | 对计划、需求、架构和决策进行多轮追问与压力测试 | **v1.0.0-personal.1** | **unversioned @ 85f83d3** | 🔵 **Customized** | ✅ **Active** |
+| [`grilling`](./skills/grilling/) | 对计划、需求、架构和决策进行多轮追问与压力测试 | **v1.1.0-personal.2** | **unversioned @ 85f83d3** | 🔵 **Customized** | ✅ **Active** |
 
 ## Skill Details
 
@@ -82,12 +82,12 @@ This Skill is intentionally different from upstream. Upstream version/commit/tre
 
 ### grilling
 
-对计划、需求、架构、工作流和产品决策进行多轮追问与压力测试的 Skill。保留上游 `design tree + frontier + round` 的核心机制，并针对长会话、中文沟通和高密度需求梳理进行了个人化。
+对计划、需求、架构、工作流和产品决策进行多轮追问与压力测试的 Skill。保留上游 `design tree + frontier + round` 的核心机制，并针对 Agent Ask 工具、长会话、中文沟通和高密度需求梳理进行了个人化。
 
 - **Local path:** [`skills/grilling/`](./skills/grilling/)
 - **Upstream:** [`mattpocock/skills`](https://github.com/mattpocock/skills/tree/main/skills/productivity/grilling)
 - **Upstream branch:** `main`
-- **Local version:** `1.0.0-personal.1`
+- **Local version:** `1.1.0-personal.2`
 - **Upstream version:** unversioned
 - **Sync state:** Customized
 - **License:** MIT
@@ -114,9 +114,12 @@ This Skill is intentionally different from upstream. Upstream version/commit/tre
     - only ask the user for real decisions/preferences or facts that only the user can know
     - unresolved research blocks only dependent branches, not the rest of the frontier
 
-4. **Batch-answer support**
-    - accept compact replies such as `Q1 B, Q2 按推荐` or `除 Q5 外其余按推荐`
-    - settle clear batch answers without forcing the user to restate every choice
+4. **Ask-tool-first interaction**
+    - when the host Agent exposes an Ask/AskUserQuestion-style tool, use it instead of rendering chat questionnaires
+    - use single-select by default; use multi-select only for genuinely additive choices
+    - rely on the host UI's custom/free-text answer path instead of inventing a fake `Other` option when the UI already provides one
+    - fill each Ask invocation with as many independent frontier questions as the host schema comfortably supports
+    - plain-text A/B/C questions and compact batch replies are fallback behavior only when no usable Ask tool exists
 
 5. **Decision ledger and conflict handling**
     - preserve settled answers and do not repeatedly ask the same decision in narrower forms

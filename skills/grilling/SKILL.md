@@ -1,13 +1,13 @@
 ---
 name: grilling
-description: Grill the user about a plan, decision, design, requirement, or idea until the material decision tree is resolved. Ask the whole currently-answerable frontier in concise rounds, research facts yourself, give a recommendation for every real decision, preserve settled answers, and do not act until the user confirms shared understanding.
+description: Grill the user about a plan, decision, design, requirement, or idea until the material decision tree is resolved. Prefer the host Agent's interactive Ask tool for frontier decisions, research facts yourself, give a recommendation for every real decision, preserve settled answers, and do not act until the user confirms shared understanding.
 license: MIT
 metadata:
     author: github.com/mattpocock
     customized_by: github.com/LingYzh
     upstream_commit: "85f83d3fde1d3a90d5c9a657f6998c79a6c37308"
     upstream_skill_blob: "8ca78c6d8f901aab0c5a1f896034b70e666ff2a3"
-    version: "1.0.0-personal.1"
+    version: "1.1.0-personal.2"
 ---
 
 # Grilling
@@ -26,7 +26,7 @@ Represent the problem as a **design tree**:
 
 Work in **rounds**.
 
-The **frontier** is the set of material decisions whose prerequisites are already settled. Ask the whole frontier in the current round. Do not ask a question whose answer depends on another still-open question in the same round; leave it for a later round.
+The **frontier** is the set of material decisions whose prerequisites are already settled. Ask the currently answerable frontier through the host Agent's interactive Ask tool when one is available. Do not ask a question whose answer depends on another still-open decision in the same frontier; leave it for a later round.
 
 After the user answers, update the tree, preserve settled decisions, recompute the frontier, and continue.
 
@@ -90,36 +90,65 @@ Recommendations should be decisive rather than neutral summaries. Base them on, 
 
 If the user has already established a general policy that resolves the current branch, apply that policy instead of asking the same decision again in a narrower form.
 
-## 5. Preferred Round Format
+## 5. Ask-Tool-First Interaction
 
-Number questions continuously across the whole grilling session.
+This Skill is designed primarily for Agent clients with an interactive user-question tool.
 
-When choices are useful, prefer a compact A/B/C-style format:
+When the host exposes an Ask / AskUserQuestion / equivalent tool, **use it instead of rendering a numbered questionnaire in ordinary chat text**.
 
-```text
-❓ **Q12 — <short title>**
+### Adapt to the host tool schema
 
-<plain-language question>
+Do not hard-code one client's exact limits. Inspect or follow the available Ask tool schema and use its native interaction model.
 
-A. <choice>
-B. <choice>
-C. <choice>
+Typical Ask tools support:
 
-➡️ **Recommended: B** — <short reason>
+- several independent questions in one tool call
+- single-select questions
+- multi-select questions
+- a user-provided custom/free-text answer path in the UI
 
----
+Use those capabilities directly.
 
-❓ **Q13 — <short title>**
-...
-```
+### Single-select by default
 
-Do not force artificial multiple-choice options when a direct question is clearer.
+Use single-select when the user should choose one primary policy or behavior.
 
-Keep the recommendation short enough that the user can scan the entire round quickly.
+Provide concise, mutually distinct choices. Mark or describe the recommended option clearly enough that the user can recognize it without reading a long essay.
+
+### Multi-select only when the decision is genuinely additive
+
+Use multi-select only when several options may validly apply at the same time, for example selecting supported export formats or enabled capabilities.
+
+Do **not** use multi-select merely to compress several unrelated decisions into one question. Separate unrelated decisions into separate Ask questions.
+
+### Preserve the custom-answer path
+
+When the host UI provides an automatic "Other", custom, or free-text answer field, rely on it for cases where the user's preferred answer is not one of the proposed choices.
+
+Do not waste an explicit option slot on a fake "Other" choice when the host already provides a custom-answer path.
+
+If the host requires an explicit custom option to enable free text, follow that schema.
+
+### Fill the Ask call efficiently
+
+When several frontier decisions are independent and the Ask tool supports several questions per invocation, put as many currently answerable questions into one Ask call as the tool comfortably supports.
+
+Do not reduce an available multi-question Ask UI to one tool invocation per trivial question unless dependency ordering requires it.
+
+If the frontier is larger than the host tool's capacity, ask up to the supported capacity, receive the answers, recompute the frontier, and continue with another Ask call.
+
+### Recommendation placement
+
+Use the host's available option label/description/help fields to surface the recommendation compactly. Prefer forms such as:
+
+- `B — Keep existing behavior (Recommended)`
+- option description: `Recommended because this matches the current project architecture.`
+
+Do not turn the Ask dialog into a wall of prose.
 
 ## 6. Ask the Whole Frontier, but Do Not Over-Grill
 
-Ask every currently answerable **material** decision in the round. Do not arbitrarily limit a round to one or two questions when several independent decisions are already unblocked.
+Ask every currently answerable **material** decision, subject to the host Ask tool's per-call capacity. Do not artificially limit the round to one or two questions when several independent decisions are already unblocked and the tool can present them together.
 
 At the same time, do not create questions for:
 
@@ -132,21 +161,34 @@ At the same time, do not create questions for:
 
 "Relentless" means no material branch is silently assumed; it does not mean maximizing friction.
 
-## 7. Accept Compressed and Batch Answers
+## 7. Text Fallback Only When No Ask Tool Exists
 
-Users do not need to answer every question with a full sentence.
+The old chat-style numbered questionnaire is a **fallback**, not the primary interaction mode.
 
-Correctly interpret answers such as:
+Use it only when the current host/client does not expose a usable interactive Ask tool.
 
-- `Q12 B, Q13 C`
-- `12/13 按推荐，14 选 A`
-- `除了 Q20，其他都按推荐`
-- `这轮推荐都没问题`
-- `其余照现有项目做`
+In text fallback mode:
 
-When the user's intent is clear, settle those decisions without asking them to restate each one.
+- number questions continuously across the session
+- use compact A/B/C choices when appropriate
+- include one recommended answer per question
+- allow concise batch replies such as `Q12 B, Q13 按推荐` because they reduce conversational round trips in plain chat
 
-If one answer is ambiguous, reopen only that decision and branches that depend on it.
+Example fallback:
+
+```text
+❓ **Q12 — <short title>**
+
+<plain-language question>
+
+A. <choice>
+B. <choice>
+C. <choice>
+
+➡️ **Recommended: B** — <short reason>
+```
+
+Do not teach or request batch-answer syntax when an interactive Ask tool is available; the tool UI already solves that interaction problem more cleanly.
 
 ## 8. Preserve Settled Decisions and Detect Conflicts
 
@@ -154,7 +196,7 @@ Maintain a compact decision ledger throughout the session.
 
 For each settled decision, preserve at least:
 
-- question/decision identifier
+- question/decision identifier or semantic key
 - selected answer or policy
 - any important constraint introduced by the answer
 
