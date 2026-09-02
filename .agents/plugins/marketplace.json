@@ -8,7 +8,7 @@
             "name": "grilling",
             "source": {
                 "source": "local",
-                "path": "./plugins/grilling"
+                "path": "./skills/grilling"
             },
             "policy": {
                 "installation": "AVAILABLE",
@@ -20,7 +20,7 @@
             "name": "vue-best-practices",
             "source": {
                 "source": "local",
-                "path": "./plugins/vue-best-practices"
+                "path": "./skills/vue-best-practices"
             },
             "policy": {
                 "installation": "AVAILABLE",

@@ -12,6 +12,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_DIR = REPO_ROOT / "skills"
 DIST_DIR = REPO_ROOT / "dist"
+EXCLUDED_TOP_LEVEL = {".codex-plugin", ".claude-plugin"}
 
 
 def skill_version(skill_dir: Path) -> str:
@@ -32,6 +33,8 @@ def package_skill(skill_dir: Path) -> Path:
             if not path.is_file():
                 continue
             relative = path.relative_to(skill_dir)
+            if relative.parts and relative.parts[0] in EXCLUDED_TOP_LEVEL:
+                continue
             output.write(path, relative.as_posix())
 
     return archive

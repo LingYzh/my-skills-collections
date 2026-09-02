@@ -1,4 +1,4 @@
-name: Check plugin sync
+name: Check distribution
 
 on:
     push:
@@ -9,7 +9,7 @@ on:
             - master
 
 jobs:
-    check-plugin-sync:
+    check-distribution:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout repository
@@ -20,5 +20,8 @@ jobs:
               with:
                   python-version: "3.12"
 
-            - name: Verify per-skill plugin distribution
-              run: python scripts/sync-plugins.py --check
+            - name: Build generic Skill ZIPs
+              run: python scripts/package-skills.py
+
+            - name: Validate marketplace and release structure
+              run: python scripts/validate-distribution.py

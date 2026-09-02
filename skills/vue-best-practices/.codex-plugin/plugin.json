@@ -15,7 +15,7 @@
         "uni-app",
         "codex"
     ],
-    "skills": "./skills/",
+    "skills": "./",
     "interface": {
         "displayName": "Vue Best Practices",
         "shortDescription": "Personal Vue 3 and uni-app development conventions",

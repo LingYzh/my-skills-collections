@@ -2,7 +2,7 @@
 
 个人使用的 AI Agent Skills 收藏、镜像、定制与分发仓库。
 
-根目录 `skills/` 是唯一源码来源。Codex 与 Claude Code marketplace 会把**每个 Skill 单独包装成一个插件**，因此用户可以按需安装单个 Skill；GitHub Release 则只发布与特定 Agent 无关的通用 Skill ZIP。
+根目录 `skills/` 既是 Skill 源码，也是 Codex / Claude Code 单 Skill 插件本体。每个 Skill 都可以从 marketplace 独立安装；GitHub Release 则只发布与特定 Agent 无关的通用 Skill ZIP。
 
 > 本仓库不是各上游项目的官方镜像。Customized Skill 的行为可能与上游不同。
 
@@ -67,7 +67,7 @@ vue-best-practices-18.6.0-personal.6.zip
 SHA256SUMS.txt
 ```
 
-每个 ZIP **不包含 plugin/marketplace 元数据**，并且 ZIP 根目录直接是该 Skill 的内容，例如：
+每个 ZIP 会排除 `.codex-plugin/` 和 `.claude-plugin/`，ZIP 根目录直接是通用 Skill 内容：
 
 ```text
 SKILL.md
@@ -75,8 +75,6 @@ agents/
 references/
 ...
 ```
-
-因此可以用于支持普通 Agent Skill ZIP 上传/安装的客户端或 API。OpenAI Skills API 同样接受单个 Skill ZIP 文件作为上传内容。
 
 ## Skill Details
 
@@ -111,37 +109,31 @@ references/
 ## Distribution Architecture
 
 ```text
-skills/                              # source of truth
+skills/
 ├── grilling/
-└── vue-best-practices/
-
-plugins/                             # generated, one Skill per plugin
-├── grilling/
+│   ├── SKILL.md
+│   ├── agents/
 │   ├── .codex-plugin/plugin.json
-│   ├── .claude-plugin/plugin.json
-│   └── skills/grilling/
+│   └── .claude-plugin/plugin.json
 └── vue-best-practices/
+    ├── SKILL.md
+    ├── references/
     ├── .codex-plugin/plugin.json
-    ├── .claude-plugin/plugin.json
-    └── skills/vue-best-practices/
+    └── .claude-plugin/plugin.json
 
-.agents/plugins/marketplace.json     # Codex marketplace
-.claude-plugin/marketplace.json      # Claude Code marketplace
+.agents/plugins/marketplace.json     # Codex marketplace -> ./skills/<name>
+.claude-plugin/marketplace.json      # Claude Code marketplace -> ./skills/<name>
 ```
 
-插件目录和 marketplace manifest 都是分发产物。**不要直接编辑 `plugins/<name>/skills/`。** 修改根 `skills/<name>/` 后运行：
+这里没有生成的 Skill mirror。`skills/<name>/` 同时承担三种角色：
 
-```bash
-python scripts/sync-plugins.py
-```
+1. 通用 Agent Skill 源码；
+2. Codex 单 Skill plugin root；
+3. Claude Code 单 Skill plugin root。
 
-仅检查：
+因此日常修改 Skill 时**不需要运行同步脚本**。修改 `skills/<name>/` 后可以直接提交；只有在 Skill 版本号变化时，需要同步修改该目录下两个 plugin manifest 的版本字段以及 marketplace 中 Claude 条目的版本字段。
 
-```bash
-python scripts/sync-plugins.py --check
-```
-
-CI 会在 `master` push / pull request 时检查根 Skill 与所有插件副本、两个 marketplace manifest 是否一致。
+CI 只验证 marketplace / plugin manifest 结构和通用 ZIP 内容，不生成或要求提交任何 Skill 副本。
 
 ## Release
 
@@ -151,7 +143,7 @@ CI 会在 `master` push / pull request 时检查根 Skill 与所有插件副本�
 python scripts/package-skills.py
 ```
 
-然后创建/更新对应 GitHub Release 并上传所有独立 Skill ZIP 与 `SHA256SUMS.txt`。
+然后创建/更新对应 GitHub Release，并上传所有独立 Skill ZIP 与 `SHA256SUMS.txt`。
 
 Release tag 是**收藏仓库版本**，Skill 自己继续使用各自 frontmatter 中的本地版本号，两者互不混用。
 

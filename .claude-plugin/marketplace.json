@@ -8,7 +8,7 @@
     "plugins": [
         {
             "name": "grilling",
-            "source": "./plugins/grilling",
+            "source": "./skills/grilling",
             "description": "Clarify material ambiguity, stress-test plans and requirements, and reduce avoidable rework.",
             "version": "1.2.0-personal.3",
             "author": {
@@ -28,7 +28,7 @@
         },
         {
             "name": "vue-best-practices",
-            "source": "./plugins/vue-best-practices",
+            "source": "./skills/vue-best-practices",
             "description": "Customized Vue 3 and uni-app development practices focused on maintainability and personal workflow conventions.",
             "version": "18.6.0-personal.6",
             "author": {
