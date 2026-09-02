@@ -1,0 +1,30 @@
+{
+    "name": "lingyzh-skills",
+    "version": "0.1.0",
+    "description": "LingYzh's personal collection of customized Agent Skills for development and agent workflows.",
+    "author": {
+        "name": "LingYzh",
+        "url": "https://github.com/LingYzh"
+    },
+    "homepage": "https://github.com/LingYzh/my-skills-collections",
+    "repository": "https://github.com/LingYzh/my-skills-collections",
+    "license": "MIT",
+    "keywords": [
+        "agent-skills",
+        "codex",
+        "vue",
+        "grilling"
+    ],
+    "skills": "./skills/",
+    "interface": {
+        "displayName": "LingYzh Skills",
+        "shortDescription": "Personal customized Agent Skills",
+        "longDescription": "A personal collection of customized Agent Skills for Vue development, requirement clarification, planning, and agent workflows.",
+        "developerName": "LingYzh",
+        "category": "Productivity",
+        "websiteURL": "https://github.com/LingYzh/my-skills-collections",
+        "defaultPrompt": [
+            "Use the installed LingYzh skills when relevant."
+        ]
+    }
+}

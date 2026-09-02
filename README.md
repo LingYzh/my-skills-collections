@@ -1,12 +1,46 @@
 # My Skills Collections
 
-个人使用的 AI Agent Skills 收藏、镜像与定制仓库。
+个人使用的 AI Agent Skills 收藏、镜像、定制与分发仓库。
 
 这个仓库用于集中保存我实际会使用或准备改造的 Skills。部分 Skill 会保持与上游一致，部分则会在保留来源与版本信息的前提下，根据个人工作流进行修改。
 
 > 本仓库不是各上游项目的官方镜像。若本地 Skill 已进行定制，其行为可能与上游版本不同。
 
 **Last status check:** 2026-09-02
+
+## Installation
+
+### Codex Plugin Marketplace
+
+本仓库提供 Codex 原生 marketplace manifest：`.agents/plugins/marketplace.json`。
+
+添加市场：
+
+```bash
+codex plugin marketplace add LingYzh/my-skills-collections --ref master
+```
+
+安装合集插件：
+
+```bash
+codex plugin add lingyzh-skills@lingyzh-skills
+```
+
+插件安装后会提供当前收录的全部 Skills。Codex 分发副本位于 `plugins/lingyzh-skills/skills/`，但根目录 `skills/` 始终是唯一源码来源。
+
+更新根目录 Skill 后运行：
+
+```bash
+python scripts/sync-codex-plugin.py
+```
+
+仅检查是否同步：
+
+```bash
+python scripts/sync-codex-plugin.py --check
+```
+
+CI 会在 `master` 的 push 和 pull request 上验证 Codex bundle 没有与根 `skills/` 漂移。
 
 ## Skills
 
@@ -142,6 +176,18 @@ This Skill is intentionally different from upstream. Upstream version/commit/tre
     - execution preflight asks only questions that block or substantially change the current task
     - low-impact hypothetical edges and decisions implied by prior policies do not deserve separate questions
 
+## Codex Distribution
+
+Codex marketplace metadata is kept separate from Skill source files:
+
+- `.agents/plugins/marketplace.json` — repository marketplace manifest
+- `plugins/lingyzh-skills/.codex-plugin/plugin.json` — Codex plugin manifest
+- `plugins/lingyzh-skills/skills/` — generated mirror of root `skills/`
+- `scripts/sync-codex-plugin.py` — sync/check helper
+- `.github/workflows/check-codex-plugin-sync.yml` — drift guard
+
+`plugins/lingyzh-skills/skills/` must not be edited directly. Edit the corresponding file under root `skills/`, then regenerate the bundle.
+
 ## Status Legend
 
 | 状态 | 含义 |
@@ -169,19 +215,32 @@ This Skill is intentionally different from upstream. Upstream version/commit/tre
 
 ```text
 my-skills-collections/
-├── README.md
-└── skills/
-    ├── grilling/
-    │   ├── SKILL.md
-    │   └── agents/
-    │       └── openai.yaml
-    └── vue-best-practices/
-        ├── SKILL.md
-        └── references/
-            └── ...
+├── .agents/
+│   └── plugins/
+│       └── marketplace.json
+├── .github/
+│   └── workflows/
+│       └── check-codex-plugin-sync.yml
+├── plugins/
+│   └── lingyzh-skills/
+│       ├── .codex-plugin/
+│       │   └── plugin.json
+│       └── skills/                  # generated mirror
+├── scripts/
+│   └── sync-codex-plugin.py
+├── skills/                          # source of truth
+│   ├── grilling/
+│   │   ├── SKILL.md
+│   │   └── agents/
+│   │       └── openai.yaml
+│   └── vue-best-practices/
+│       ├── SKILL.md
+│       └── references/
+│           └── ...
+└── README.md
 ```
 
-后续新增 Skill 时统一放入 `skills/<skill-name>/`，并在本 README 的 Skills 表格中登记来源、版本和同步状态。
+后续新增 Skill 时统一放入 `skills/<skill-name>/`，并在本 README 的 Skills 表格中登记来源、版本和同步状态；随后运行同步脚本更新 Codex plugin bundle。
 
 ## Sources & Licenses
 

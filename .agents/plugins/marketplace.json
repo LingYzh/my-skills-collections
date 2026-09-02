@@ -1,0 +1,20 @@
+{
+    "name": "lingyzh-skills",
+    "interface": {
+        "displayName": "LingYzh Skills"
+    },
+    "plugins": [
+        {
+            "name": "lingyzh-skills",
+            "source": {
+                "source": "local",
+                "path": "./plugins/lingyzh-skills"
+            },
+            "policy": {
+                "installation": "AVAILABLE",
+                "authentication": "ON_INSTALL"
+            },
+            "category": "Productivity"
+        }
+    ]
+}
