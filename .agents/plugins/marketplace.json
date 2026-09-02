@@ -5,16 +5,28 @@
     },
     "plugins": [
         {
-            "name": "lingyzh-skills",
+            "name": "grilling",
             "source": {
                 "source": "local",
-                "path": "./plugins/lingyzh-skills"
+                "path": "./plugins/grilling"
             },
             "policy": {
                 "installation": "AVAILABLE",
                 "authentication": "ON_INSTALL"
             },
             "category": "Productivity"
+        },
+        {
+            "name": "vue-best-practices",
+            "source": {
+                "source": "local",
+                "path": "./plugins/vue-best-practices"
+            },
+            "policy": {
+                "installation": "AVAILABLE",
+                "authentication": "ON_INSTALL"
+            },
+            "category": "Developer Tools"
         }
     ]
 }

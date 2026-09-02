@@ -1,0 +1,35 @@
+name: Release skill ZIPs
+
+on:
+    push:
+        tags:
+            - "v*"
+
+permissions:
+    contents: write
+
+jobs:
+    release:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
+
+            - name: Build generic Agent Skill ZIPs
+              run: python scripts/package-skills.py
+
+            - name: Create or update GitHub Release
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  TAG: ${{ github.ref_name }}
+              run: |
+                  if gh release view "$TAG" >/dev/null 2>&1; then
+                      gh release upload "$TAG" dist/*.zip dist/SHA256SUMS.txt --clobber
+                  else
+                      gh release create "$TAG" dist/*.zip dist/SHA256SUMS.txt --generate-notes --title "$TAG"
+                  fi

@@ -1,0 +1,30 @@
+{
+    "name": "grilling",
+    "version": "1.2.0-personal.3",
+    "description": "Clarify material ambiguity, stress-test plans and requirements, and reduce avoidable rework.",
+    "author": {
+        "name": "LingYzh",
+        "url": "https://github.com/LingYzh"
+    },
+    "homepage": "https://github.com/LingYzh/my-skills-collections",
+    "repository": "https://github.com/LingYzh/my-skills-collections",
+    "license": "MIT",
+    "keywords": [
+        "agent-skills",
+        "grilling",
+        "requirements",
+        "codex"
+    ],
+    "skills": "./skills/",
+    "interface": {
+        "displayName": "Grilling",
+        "shortDescription": "Clarify material ambiguity before planning or execution",
+        "longDescription": "Stress-test plans and requirements, resolve material ambiguity through Ask-tool-first interaction, and reduce avoidable rework before execution.",
+        "developerName": "LingYzh",
+        "category": "Productivity",
+        "websiteURL": "https://github.com/LingYzh/my-skills-collections",
+        "defaultPrompt": [
+            "Use the grilling skill when material ambiguity should be resolved before planning or execution."
+        ]
+    }
+}

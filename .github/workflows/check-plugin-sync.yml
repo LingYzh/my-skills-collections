@@ -1,4 +1,4 @@
-name: Check Codex plugin sync
+name: Check plugin sync
 
 on:
     push:
@@ -9,7 +9,7 @@ on:
             - master
 
 jobs:
-    check-codex-plugin-sync:
+    check-plugin-sync:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout repository
@@ -20,5 +20,5 @@ jobs:
               with:
                   python-version: "3.12"
 
-            - name: Verify Codex plugin skill bundle
-              run: python scripts/sync-codex-plugin.py --check
+            - name: Verify per-skill plugin distribution
+              run: python scripts/sync-plugins.py --check

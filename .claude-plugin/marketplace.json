@@ -4,14 +4,13 @@
         "name": "LingYzh",
         "url": "https://github.com/LingYzh"
     },
-    "description": "LingYzh's personal collection of customized Agent Skills.",
-    "version": "0.1.0",
+    "description": "LingYzh's personal marketplace of customized Agent Skills.",
     "plugins": [
         {
-            "name": "lingyzh-skills",
-            "source": "./plugins/lingyzh-skills",
-            "description": "Customized Agent Skills for Vue development, requirement clarification, planning, and agent workflows.",
-            "version": "0.1.0",
+            "name": "grilling",
+            "source": "./plugins/grilling",
+            "description": "Clarify material ambiguity, stress-test plans and requirements, and reduce avoidable rework.",
+            "version": "1.2.0-personal.3",
             "author": {
                 "name": "LingYzh",
                 "url": "https://github.com/LingYzh"
@@ -21,11 +20,31 @@
             "license": "MIT",
             "keywords": [
                 "agent-skills",
-                "claude-code",
-                "vue",
-                "grilling"
+                "grilling",
+                "requirements",
+                "claude-code"
             ],
             "category": "Productivity"
+        },
+        {
+            "name": "vue-best-practices",
+            "source": "./plugins/vue-best-practices",
+            "description": "Customized Vue 3 and uni-app development practices focused on maintainability and personal workflow conventions.",
+            "version": "18.6.0-personal.6",
+            "author": {
+                "name": "LingYzh",
+                "url": "https://github.com/LingYzh"
+            },
+            "homepage": "https://github.com/LingYzh/my-skills-collections",
+            "repository": "https://github.com/LingYzh/my-skills-collections",
+            "license": "MIT",
+            "keywords": [
+                "agent-skills",
+                "vue",
+                "uni-app",
+                "claude-code"
+            ],
+            "category": "Developer Tools"
         }
     ]
 }

@@ -1,8 +1,8 @@
 {
-    "name": "lingyzh-skills",
-    "displayName": "LingYzh Skills",
-    "version": "0.1.0",
-    "description": "LingYzh's personal collection of customized Agent Skills for development and agent workflows.",
+    "name": "grilling",
+    "displayName": "Grilling",
+    "version": "1.2.0-personal.3",
+    "description": "Clarify material ambiguity, stress-test plans and requirements, and reduce avoidable rework.",
     "author": {
         "name": "LingYzh",
         "url": "https://github.com/LingYzh"
@@ -12,9 +12,9 @@
     "license": "MIT",
     "keywords": [
         "agent-skills",
-        "claude-code",
-        "vue",
-        "grilling"
+        "grilling",
+        "requirements",
+        "claude-code"
     ],
     "skills": "./skills/"
 }

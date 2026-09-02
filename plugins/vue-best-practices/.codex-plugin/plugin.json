@@ -1,0 +1,30 @@
+{
+    "name": "vue-best-practices",
+    "version": "18.6.0-personal.6",
+    "description": "Customized Vue 3 and uni-app development practices focused on maintainability and personal workflow conventions.",
+    "author": {
+        "name": "LingYzh",
+        "url": "https://github.com/LingYzh"
+    },
+    "homepage": "https://github.com/LingYzh/my-skills-collections",
+    "repository": "https://github.com/LingYzh/my-skills-collections",
+    "license": "MIT",
+    "keywords": [
+        "agent-skills",
+        "vue",
+        "uni-app",
+        "codex"
+    ],
+    "skills": "./skills/",
+    "interface": {
+        "displayName": "Vue Best Practices",
+        "shortDescription": "Personal Vue 3 and uni-app development conventions",
+        "longDescription": "Customized Vue 3 and uni-app development guidance covering JS/JSDoc/TS tiers, four-space formatting, request layering, async UI locks, Pinia, Axios, and platform gates.",
+        "developerName": "LingYzh",
+        "category": "Developer Tools",
+        "websiteURL": "https://github.com/LingYzh/my-skills-collections",
+        "defaultPrompt": [
+            "Use vue-best-practices for Vue.js and uni-app Vue development tasks."
+        ]
+    }
+}
