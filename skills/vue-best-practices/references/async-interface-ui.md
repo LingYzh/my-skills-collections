@@ -1,48 +1,210 @@
 ---
 title: Async API Calls and UI Loading Locks
 impact: HIGH
-impactDescription: Unguarded async UI actions cause duplicate submissions, conflicting state changes, and race-condition bugs
+impactDescription: Clear request layering plus guarded async UI prevents duplicated transport logic, duplicate submissions, conflicting state changes, and race-condition bugs
 type: best-practice
-tags: [vue3, async, api, promise, axios, loading, disabled, ui-lock, race-condition, uni-app]
+tags: [vue3, async, api, promise, axios, request-wrapper, loading, disabled, ui-lock, race-condition, uni-app]
 ---
 
 # Async API Calls and UI Loading Locks
 
-UI-triggered API/interface calls must prevent duplicate or conflicting user actions while the request is pending. Prefer Promise chaining for ordinary request flow and restore application-level loading/interaction locks in `finally()`, while respecting platform-specific lifecycle rules.
+UI-triggered API/interface calls should use a clear request architecture and prevent duplicate or conflicting user actions while a request is pending.
 
-**Axios is an approved ecosystem dependency for ordinary Web Vue projects in this Skill.** It may be used directly when the project already uses it or when a new Web Vue project needs a reusable HTTP client/request layer. It is not treated as a universal uni-app transport.
+Prefer this three-layer model when Axios is used:
+
+```text
+utils/request.js
+    -> configured Axios instance + interceptors
+api/<feature>.js
+    -> semantic endpoint functions
+page/component
+    -> business flow + Promise chain + UI loading lock
+```
+
+The transport layer owns transport concerns. API definition files own endpoint definitions. Business components own UI state and interaction locks.
 
 ## Task List
 
 - Prefer Promise chaining (`.then().catch().finally()`) for ordinary API/interface calls
 - Reuse the project's existing request wrapper/client when one exists
-- Axios is an approved Web Vue HTTP client; do not replace a working request layer incidentally
-- In cross-platform uni-app code, prefer the project's `uni.request`-based abstraction unless Axios compatibility is already established for the actual targets
+- When Axios is used, prefer one project-owned configured `request` instance instead of direct Axios calls scattered through business code
+- Define endpoints as named functions in feature/domain API modules
+- Call those API functions from business pages/components; avoid embedding endpoint URLs and transport config in the UI layer
+- Respect the request wrapper's resolved response contract instead of blindly reading `response.data`
+- Keep component/page loading locks out of global request interceptors unless the project explicitly implements a global loading policy
 - Set an operation-specific loading state before the request starts
 - Guard the handler against duplicate execution while loading
 - Disable or otherwise lock conflicting UI controls during the request
-- Show a loading state when the operation is user-visible
 - Release application-level state locks in `.finally()` for both success and failure paths
 - Keep unrelated actions enabled when they cannot conflict
-- Use a request token/counter instead of one boolean if overlapping requests are intentionally allowed
-- In uni-app, hide `uni.showLoading()` before calling `uni.showToast()`; do not rely on a later `uni.hideLoading()` in `.finally()`
+- In uni-app, do not reject Axios merely because the target is a mini program; choose transport from actual project/target compatibility
+- In uni-app, hide `uni.showLoading()` before a following `uni.showToast()`; do not rely on a later `uni.hideLoading()` in `.finally()`
 
-## Default Pattern
+## 1. Preferred Axios Architecture
+
+### Layer 1 — `utils/request.js`: configured transport
+
+Create/configure Axios once and export the configured instance.
+
+Typical responsibilities include:
+
+- `baseURL`
+- timeout
+- auth/token headers
+- request/response interceptors
+- request serialization/normalization
+- duplicate-request or repeat-submit protection when the project needs it
+- common response-code handling
+- common transport/network error normalization
+
+```js
+// utils/request.js
+import axios from 'axios'
+
+const service = axios.create({
+    baseURL: import.meta.env.VITE_APP_BASE_API,
+    timeout: 10000
+})
+
+service.interceptors.request.use((config) => {
+    return config
+})
+
+service.interceptors.response.use(
+    (response) => {
+        return response.data
+    },
+    (error) => {
+        return Promise.reject(error)
+    }
+)
+
+export default service
+```
+
+Do not put page/component-specific `isLoading`, button disabling, modal state, or local UI flow inside this global request instance. Those concerns belong to the business layer.
+
+### Layer 2 — `api/<feature>.js`: semantic API definitions
+
+API definition files import the configured `request` instance and expose named business/domain functions.
+
+```js
+import request from '@/utils/request'
+
+// 查询活动模板列表
+export function listEventFormat(query) {
+    return request({
+        url: '/business/eventFormat/list',
+        method: 'get',
+        params: query
+    })
+}
+```
+
+Prefer this over business components doing:
+
+```js
+request({
+    url: '/business/eventFormat/list',
+    method: 'get',
+    params: query
+})
+```
+
+or:
+
+```js
+axios.get('/business/eventFormat/list', {
+    params: query
+})
+```
+
+The named API function keeps endpoint paths, HTTP methods, and parameter placement out of volatile UI/business code.
+
+Group endpoint functions by the project's existing domain/feature organization. Do not create a new API-folder taxonomy merely because this reference shows one.
+
+### Layer 3 — page/component: business flow and UI lock
+
+Business code imports semantic API functions and handles local UI state around them.
 
 ```vue
 <script setup>
 import { ref } from 'vue'
+import { listEventFormat } from '@/api/business/eventFormat'
+
+const loading = ref(false)
+const rows = ref([])
+const query = {
+    pageNum: 1,
+    pageSize: 20
+}
+
+function loadList() {
+    if (loading.value) return
+
+    loading.value = true
+
+    listEventFormat(query)
+        .then((data) => {
+            rows.value = data.rows ?? []
+        })
+        .catch((error) => {
+            handleLoadError(error)
+        })
+        .finally(() => {
+            loading.value = false
+        })
+}
+</script>
+```
+
+If the response interceptor already resolves `response.data`, `listEventFormat()` resolves that normalized business payload. Do **not** mechanically write `response.data` again in the page layer. Follow the actual contract of the project's request wrapper.
+
+## 2. Promise Chaining Is the Default Business Call Style
+
+For ordinary request -> success -> failure -> cleanup flows, prefer:
+
+```js
+listEventFormat(query)
+    .then((data) => {
+        applyList(data)
+    })
+    .catch((error) => {
+        handleLoadError(error)
+    })
+    .finally(() => {
+        loading.value = false
+    })
+```
+
+Use `async` / `await` only when it materially improves readability, especially when several dependent asynchronous branches make a Promise chain harder to follow.
+
+Do not convert an existing clear Promise chain to `async` / `await` incidentally.
+
+## 3. UI Loading Locks Belong to the Operation
+
+The transport/request layer may implement network-level duplicate protection, but that does **not** replace business/UI locking.
+
+A UI-triggered operation should normally have both:
+
+1. a handler guard, so programmatic/repeated entry cannot start the same operation again
+2. disabled/locked conflicting controls, so the user cannot trigger conflicting state changes while the request is pending
+
+```vue
+<script setup>
+import { ref } from 'vue'
+import { saveProfile } from '@/api/profile'
 
 const isSaving = ref(false)
 
-function saveProfile() {
+function submitProfile(payload) {
     if (isSaving.value) return
 
     isSaving.value = true
 
-    updateProfileApi()
-        .then((result) => {
-            applySavedProfile(result)
+    saveProfile(payload)
+        .then((data) => {
+            applySavedProfile(data)
         })
         .catch((error) => {
             showSaveError(error)
@@ -56,88 +218,14 @@ function saveProfile() {
 <template>
     <button
         :disabled="isSaving"
-        @click="saveProfile"
+        @click="submitProfile(formData)"
     >
         {{ isSaving ? 'Saving...' : 'Save' }}
     </button>
 </template>
 ```
 
-This deliberately uses two guards:
-
-1. The handler rejects duplicate/programmatic entry while pending.
-2. The UI prevents the user from triggering a conflicting action.
-
-## Prefer Promise Chaining for Interface Calls
-
-```js
-isLoading.value = true
-
-fetchUserApi(userId)
-    .then((user) => {
-        currentUser.value = user
-    })
-    .catch((error) => {
-        handleLoadError(error)
-    })
-    .finally(() => {
-        isLoading.value = false
-    })
-```
-
-Use `async` / `await` when it materially improves readability, especially for several dependent asynchronous branches. Do not convert an existing clear Promise chain incidentally.
-
-## Axios in Ordinary Web Vue Projects
-
-When Axios is already the project's HTTP client, use its existing configured instance/interceptors rather than importing the default client everywhere.
-
-A simple project-owned request client can look like:
-
-```js
-// api/http.js
-import axios from 'axios'
-
-export const http = axios.create({
-    baseURL: '/api'
-})
-```
-
-Then business code remains chain-oriented:
-
-```js
-import { http } from '@/api/http'
-
-function loadUser(userId) {
-    if (isLoading.value) return
-
-    isLoading.value = true
-
-    return http
-        .get(`/users/${userId}`)
-        .then((response) => {
-            currentUser.value = response.data
-        })
-        .catch((error) => {
-            handleLoadError(error)
-        })
-        .finally(() => {
-            isLoading.value = false
-        })
-}
-```
-
-Prefer a shared Axios instance when the application needs common `baseURL`, headers, interceptors, authentication/error handling, or cancellation behavior.
-
-Do **not**:
-
-- replace an existing working request wrapper/fetch layer merely to standardize on Axios
-- create many differently configured Axios instances without a real boundary
-- bury UI loading locks exclusively inside a global interceptor when the lock belongs to one specific operation
-- assume Axios is portable to every uni-app non-Web target
-
-For a new ordinary Web Vue application with a meaningful reusable HTTP layer and no established request client, Axios is an approved default choice in this Skill.
-
-## Scope the Lock to the Operation
+Scope locks to the operation:
 
 ```js
 const isLoadingUsers = ref(false)
@@ -145,73 +233,32 @@ const isSavingProfile = ref(false)
 const isDeletingItem = ref(false)
 ```
 
-Avoid one global `isLoading` flag when independent operations can safely run separately. The purpose is to block **conflicting** user behavior, not freeze unrelated parts of the application.
+Avoid one global `isLoading` flag when independent operations can safely run separately.
 
-## Lock Every Conflicting Entry Point
+## 4. Axios Is Approved Beyond Web-Only Projects When Compatibility Is Real
 
-If the same operation can be triggered from several controls, they must share the same lock.
+Do not use a blanket rule such as "uni-app non-H5 must use `uni.request`".
 
-```vue
-<template>
-    <button :disabled="isSubmitting" @click="submitOrder">
-        Submit
-    </button>
+Axios may remain the preferred request layer in uni-app when:
 
-    <button :disabled="isSubmitting" @click="submitOrder">
-        Submit and Close
-    </button>
-</template>
-```
+- the project already uses an Axios-based `request` wrapper successfully on the target
+- the project is single-target and that App/mini-program runtime is verified compatible
+- the selected Axios version/runtime works directly for the required features
+- the project already uses a compatible Axios adapter and the extra adapter behavior is actually needed
 
-For navigation, destructive actions, form mutation, or other interactions that would invalidate the pending request, disable or guard those actions until the request settles.
+A mini-program target by itself is **not** evidence that Axios must be removed.
 
-## Use `finally()` for Application-Level Lock Cleanup
+Use or fall back to `uni.request` / a `uni.request`-based wrapper when there is a concrete reason, such as:
 
-**BAD:**
+- the target/runtime actually fails with the current Axios setup
+- required Axios/browser adapter behavior is unavailable
+- the feature needs uni-app/platform-specific request options or request-task APIs that the current Axios layer does not expose correctly
+- multi-target compatibility is required and the existing Axios setup is not verified across all targets
+- the project already standardizes on a `uni.request` wrapper and replacing it would create unnecessary migration work
 
-```js
-isLoading.value = true
+Do not install an Axios adapter merely because the project is uni-app. First verify whether the existing Axios setup already works for the actual target and required request features.
 
-requestApi()
-    .then(() => {
-        isLoading.value = false
-    })
-    .catch(() => {
-        isLoading.value = false
-    })
-```
-
-**GOOD:**
-
-```js
-isLoading.value = true
-
-requestApi()
-    .then(handleSuccess)
-    .catch(handleError)
-    .finally(() => {
-        isLoading.value = false
-    })
-```
-
-`finally()` is the normal cleanup point for application-level flags because it runs after either fulfillment or rejection. Platform-native loading/toast APIs can have additional ordering constraints.
-
-## uni-app Request Transport
-
-For uni-app code shared across App/mini-program targets, `uni.request` or an existing project wrapper around it is the normal portable transport.
-
-Do not introduce Axios into shared non-H5 uni-app code merely because Axios is approved for ordinary Web Vue. Non-Web uni-app runtimes are not normal browser/XHR environments.
-
-Axios is acceptable in uni-app when:
-
-- the feature is H5/Web-only, or
-- the existing project already has a tested Axios adapter/wrapper that supports all required targets
-
-Otherwise preserve the cross-platform request layer already used by the project.
-
-Vue 3 uni-app APIs support Promise-style calls, so the preferred chain style can still be used with `uni.request`/project wrappers without requiring Axios.
-
-## uni-app: Hide Loading Before `showToast`
+## 5. uni-app: Hide Loading Before `showToast`
 
 When a request uses both `uni.showLoading()` and `uni.showToast()`:
 
@@ -282,18 +329,19 @@ function submitForm() {
 }
 ```
 
-The important order is:
+Required order:
 
 ```text
-request settles
+request success/failure
     -> uni.hideLoading()
     -> uni.showToast(...)
-    -> finally: release reactive/business interaction lock
+    -> finally
+        -> release reactive/business interaction lock
 ```
 
 If a branch does not show a toast, it must still explicitly close the native loading layer at the appropriate point.
 
-## Prevent Earlier Requests from Unlocking a Later Request
+## 6. Concurrent Requests
 
 If overlapping requests are intentionally allowed, use a counter or request token instead of one boolean.
 
@@ -314,13 +362,13 @@ const isLoading = computed(() => pendingCount.value > 0)
 
 If requests should never overlap, prefer the simpler operation-specific boolean plus duplicate-entry guard.
 
-## Loading UI Requirements
+## Final Checks for Request Code
 
-When the operation is visible to the user:
-
-- disable the initiating control or conflicting controls
-- show spinner/text/progress feedback where appropriate
-- keep the current UI stable until the operation settles
-- do not allow repeated submits, destructive actions, or state changes that conflict with the pending request
-- restore application-level controls in `finally()` even when the request fails
-- keep platform-native loading/toast teardown order correct instead of assuming every visual cleanup belongs in `finally()`
+- transport/config/interceptors stay in the shared request layer
+- endpoint URL/method/params stay in named API functions
+- volatile page/component code imports semantic API functions instead of raw Axios/request config when practical
+- business code respects the wrapper's resolved response shape
+- UI loading/disabled locks stay at the operation/business layer
+- Promise chaining is used for ordinary request flow
+- uni-app transport choice is based on actual compatibility, not on a blanket H5/non-H5 split
+- `uni.hideLoading()` precedes a following `uni.showToast()`

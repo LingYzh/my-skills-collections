@@ -3,27 +3,27 @@ title: uni-app Platform Compatibility Gate
 impact: HIGH
 impactDescription: uni-app compiles Vue code to multiple runtimes whose component, DOM, routing, networking, and platform capabilities differ materially
 type: platform-gate
-tags: [vue3, uni-app, h5, app, mini-program, platform, compatibility, routing, dom, request]
+tags: [vue3, uni-app, h5, app, mini-program, platform, compatibility, routing, dom, request, axios]
 ---
 
 # uni-app Platform Compatibility Gate
 
 Load this reference for **every uni-app task before applying browser-oriented Vue guidance**.
 
-A `.vue` file in uni-app is not evidence that browser DOM APIs, Vue Router patterns, Axios/browser networking assumptions, or every Vue built-in component is available on the target runtime.
+A `.vue` file in uni-app is not evidence that browser DOM APIs, Vue Router patterns, or every Vue built-in component is available on the target runtime. Networking must also be selected from the actual project/target behavior rather than a blanket H5/non-H5 rule.
 
 ## Task List
 
 - Identify the actual build target(s) before selecting Vue APIs
 - Treat H5/Web, App, and mini-program targets as different runtimes
-- Do not assume `window`, `document`, browser DOM nodes, XHR, or browser event APIs outside H5
+- Do not assume `window`, `document`, browser DOM nodes, or browser event APIs outside H5
 - Do not introduce Vue Router / `RouterView` patterns into ordinary uni-app page routing
 - Check target support before using dynamic components, transition built-ins, keep-alive, teleport, suspense, or DOM-oriented template refs
-- Prefer `uni.request` / the project's existing cross-platform request wrapper for shared App/mini-program networking
-- Use Axios in uni-app only for H5/Web-only code or when the project already has a tested compatible adapter/wrapper for all required targets
-- Prefer uni-app/project-native navigation and platform APIs when the target requires them
+- Reuse an existing Axios/request layer when it is already proven compatible with the actual target
+- Do not force `uni.request` merely because the target is App or a mini program
+- Use `uni.request` / an existing uni request wrapper when there is a concrete compatibility or platform-capability reason
 - Preserve multi-platform compatibility when the feature is shared across targets
-- Apply `async-interface-ui.md` for `uni.showLoading()` / `uni.showToast()` ordering
+- Apply `async-interface-ui.md` for request layering and `uni.showLoading()` / `uni.showToast()` ordering
 
 ## 1. Identify the Target First
 
@@ -37,7 +37,7 @@ Before implementing a platform-sensitive feature, determine whether the project/
 
 Look at the project's existing configuration, conditional compilation, scripts, platform-specific files, and surrounding code. Do not invent a target from assumptions.
 
-If the same code is compiled to several targets, choose the portable solution first or isolate platform-specific behavior explicitly.
+If the same code is compiled to several targets, choose a solution already verified across those targets or isolate target-specific behavior explicitly.
 
 ## 2. Do Not Assume Browser DOM Outside H5
 
@@ -57,21 +57,47 @@ For non-H5 targets:
 - use supported uni/platform APIs when required
 - isolate H5-only behavior with the project's established conditional-compilation strategy when the feature is intentionally platform-specific
 
-Do not add a browser polyfill or third-party DOM abstraction as an incidental fix.
+Do not add a browser polyfill or DOM abstraction as an incidental fix.
 
-## 3. Networking Is Platform-Sensitive Too
+## 3. Networking: Verify Compatibility Instead of Assuming Incompatibility
 
-Ordinary Web Vue can use browser-oriented HTTP clients such as Axios. Shared uni-app App/mini-program code should not assume a browser/XHR runtime.
+Do **not** use this simplistic rule:
 
-For cross-platform uni-app networking, prefer:
+```text
+H5 -> Axios
+App/mini-program -> uni.request
+```
 
-1. the project's existing request wrapper if one is established
-2. `uni.request` or a project wrapper around it
-3. Axios only when the code is H5/Web-only or the project already has a tested adapter/wrapper compatible with every required target
+That is too strict.
 
-Do not replace a working `uni.request` abstraction with Axios merely to standardize syntax.
+Axios can be a normal choice in uni-app when the actual target/project setup supports it. A mini-program target by itself is not proof that Axios is unusable.
 
-Vue 3 uni-app APIs support Promise-style invocation, so chain-oriented request flow does not require Axios.
+Prefer this decision order:
+
+1. **Existing project request layer** — if the project already has a working Axios-based `request` wrapper on the target, keep using it.
+2. **Verified Axios on the target** — for a single-target App/mini-program project, Axios can remain the preferred transport when the required request features work correctly.
+3. **Existing `uni.request` wrapper** — keep it when the project already standardizes on it.
+4. **`uni.request` fallback/platform transport** — use it when there is a concrete compatibility gap or a uni-specific capability is required.
+
+Use `uni.request` / a wrapper around it when, for example:
+
+- the current Axios setup actually fails on the target
+- an Axios adapter/runtime feature required by the project is unavailable or unreliable
+- the request needs uni-app/platform-specific options or `RequestTask` capabilities that the current Axios layer does not expose correctly
+- upload/download/network behavior depends on target-specific uni APIs
+- one shared implementation must cover several targets and the Axios setup has not been verified across all of them
+
+Do **not** install an Axios adapter solely because the project is uni-app. First check whether the existing Axios version/setup already works for the actual target and required features.
+
+Conversely, do not replace a working Axios request architecture with raw `uni.request` simply to appear more cross-platform.
+
+The request layering rules in `async-interface-ui.md` still apply. When Axios is used, prefer:
+
+```text
+utils/request.js -> api/<feature>.js -> page/component
+```
+
+When `uni.request` is used, keep the same separation through a project-owned request wrapper where practical.
 
 ## 4. Template Refs Are Platform-Sensitive
 
@@ -108,7 +134,7 @@ Their availability differs by target and runtime version. Therefore:
 2. Reuse an existing project pattern if one already solves the problem.
 3. Do not import a Web Vue architecture into a cross-platform feature merely because the source syntax compiles as Vue.
 
-The optional feature references in this Skill are **Web Vue guidance unless this platform gate confirms applicability**.
+The optional feature references in this Skill are Web Vue guidance unless this platform gate confirms applicability.
 
 ## 6. uni-app Page Routing Is Not Ordinary Vue Router Routing
 
@@ -159,7 +185,7 @@ Examples:
 
 - `sfc.md` DOM-ref example -> H5/browser only unless target support is confirmed
 - `composables.md` window event example -> H5/browser only
-- `async-interface-ui.md` Axios example -> Web Vue/H5 only unless project compatibility is already established
+- `async-interface-ui.md` Axios architecture -> valid in uni-app when the actual target/project Axios layer is compatible
 - `component-transition.md` -> load only when target supports the transition built-in
 - `component-keep-alive.md` -> load only when target supports the built-in and the architecture actually needs it
 - `component-teleport.md` -> verify target support before use
@@ -167,15 +193,8 @@ Examples:
 
 ## 10. Dependency Discipline Still Applies
 
-Platform incompatibility is **not automatic permission to install a compatibility package**.
-
-Prefer, in order:
-
-1. capabilities already provided by uni-app / the target platform
-2. abstractions already present in the project
-3. a simple platform-specific implementation when necessary
-4. a new dependency only as an explicit architectural choice with a concrete benefit
-
 Pinia remains an approved Vue ecosystem state solution when the project needs app-level shared state and the target/project setup supports it.
 
-Axios is an approved ordinary Web Vue HTTP client, but it is **not** a universal uni-app transport. In cross-platform uni-app networking, the platform gate overrides the generic Axios allowance.
+Axios is also an approved request-layer dependency in uni-app **when the actual target compatibility is verified**. The platform gate is not an Axios ban; it only prevents assuming compatibility where the runtime/network features are known to differ.
+
+Other new compatibility packages or adapters remain explicit architecture choices. Use them only when a real compatibility requirement justifies them.

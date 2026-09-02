@@ -12,7 +12,7 @@
 
 | Skill | 用途 | Local | Upstream | 同步状态 | 本地状态 |
 | --- | --- | --- | --- | --- | --- |
-| [`vue-best-practices`](./skills/vue-best-practices/) | Vue 3 / Composition API / uni-app Vue 开发实践 | **v18.5.0-personal.5** | **v18.0.0** | 🔵 **Customized** | ✅ **Active** |
+| [`vue-best-practices`](./skills/vue-best-practices/) | Vue 3 / Composition API / uni-app Vue 开发实践 | **v18.6.0-personal.6** | **v18.0.0** | 🔵 **Customized** | ✅ **Active** |
 
 ## Skill Details
 
@@ -23,7 +23,7 @@ Vue 3 开发工作流与最佳实践 Skill。当前个人版本重点关注业�
 - **Local path:** [`skills/vue-best-practices/`](./skills/vue-best-practices/)
 - **Upstream:** [`vuejs-ai/skills`](https://github.com/vuejs-ai/skills/tree/main/skills/vue-best-practices)
 - **Upstream branch:** `main`
-- **Local version:** `18.5.0-personal.5`
+- **Local version:** `18.6.0-personal.6`
 - **Based on upstream version:** `18.0.0`
 - **Sync state:** Customized
 - **License:** MIT
@@ -47,8 +47,10 @@ Vue 3 开发工作流与最佳实践 Skill。当前个人版本重点关注业�
     - legacy 2-space/mixed files are normalized when edited
     - existing project formatting tools are aligned when necessary so they do not revert edited source
 
-3. **Async UI interaction policy**
+3. **Async request/UI policy**
     - Promise chaining is preferred for ordinary API/interface request flow
+    - Axios projects prefer `utils/request.js -> api/<feature>.js -> page/component` layering
+    - request wrappers own transport/interceptor concerns; API modules own endpoint definitions; pages/components own UI loading locks
     - conflicting UI actions are locked while requests are pending
     - uni-app native loading is hidden before a following toast; application-level locks remain a `finally()` cleanup concern
 
@@ -60,13 +62,13 @@ Vue 3 开发工作流与最佳实践 Skill。当前个人版本重点关注业�
 5. **uni-app platform gate**
     - H5/Web, App, and mini-program targets are treated as different runtimes
     - DOM, routing, refs, networking, Teleport, Transition, KeepAlive, Suspense, and other platform-sensitive guidance must pass compatibility checks first
-    - shared App/mini-program networking normally stays on `uni.request` or the project's existing cross-platform wrapper
+    - Axios is allowed on App/mini-program targets when the actual project/runtime is compatible; non-H5 is not an automatic reason to switch transport
+    - `uni.request` is used when there is a concrete compatibility/platform-network reason or when it is already the project standard
 
 6. **Dependency-conservative policy with approved ecosystem exceptions**
     - Pinia is an approved/default Vue app-level state solution when a genuine global store boundary exists
-    - Axios is an approved HTTP client for ordinary Web Vue applications and may be used for a new request layer when no established layer exists
+    - Axios is an approved request-layer dependency for Vue and compatible uni-app targets
     - existing request/store architecture is not replaced incidentally
-    - Axios is not assumed portable to uni-app App/mini-program targets; the uni-app platform gate wins
     - other third-party libraries still require an explicit technical reason or an existing project dependency
 
 7. **Upstream rule cleanup**

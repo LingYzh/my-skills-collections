@@ -1,12 +1,12 @@
 ---
 name: vue-best-practices
-description: MUST be used for Vue.js and uni-app Vue tasks. Defaults to Vue 3 Composition API with `<script setup>` for new code while respecting existing project architecture. Chooses JavaScript, optional JSDoc, or TypeScript by code stability; enforces four-space indentation; uses task-scoped reference loading; treats Pinia and Axios as approved ecosystem dependencies with platform-aware limits; and applies explicit uni-app platform gates plus async UI loading locks.
+description: MUST be used for Vue.js and uni-app Vue tasks. Defaults to Vue 3 Composition API with `<script setup>` for new code while respecting existing project architecture. Chooses JavaScript, optional JSDoc, or TypeScript by code stability; enforces four-space indentation; uses task-scoped reference loading; treats Pinia and Axios as approved ecosystem dependencies; prefers layered request wrappers/API modules; and applies explicit uni-app platform gates plus async UI loading locks.
 license: MIT
 metadata:
     author: github.com/vuejs-ai
     customized_by: github.com/LingYzh
     upstream_version: "18.0.0"
-    version: "18.5.0-personal.5"
+    version: "18.6.0-personal.6"
 ---
 
 # Vue Best Practices Workflow
@@ -22,7 +22,8 @@ Use this Skill as a decision framework, not as permission to rewrite unrelated p
 - **Prefer locality for volatile business code:** extraction is useful only when it creates a meaningful responsibility/reuse/lifecycle boundary.
 - **Keep state ownership predictable:** minimize duplicated source state and derive values when practical.
 - **Make data flow understandable:** use the simplest communication mechanism that keeps ownership clear.
-- **Platform comes before Web assumptions:** uni-app targets must pass the platform compatibility gate before browser-oriented Vue guidance is applied.
+- **Layer request code deliberately:** configured request transport -> semantic API functions -> business/UI Promise chains.
+- **Platform comes before assumptions:** uni-app targets must pass the platform compatibility gate before browser-oriented Vue guidance is applied.
 - **Async UI must be guarded:** user-triggered requests need operation-level loading/interaction locks.
 - **Dependencies remain deliberate:** examples are not general authorization to install packages, with explicit approved exceptions for Pinia and Axios under the rules below.
 - **Performance is evidence-driven:** optimize measured hot paths, not magic thresholds from examples.
@@ -37,7 +38,7 @@ Determine:
 2. Whether this is normal Web Vue, SSR, uni-app H5, uni-app App, mini program, or another compiled target.
 3. Existing API style: Composition API / Options API / JSX where relevant.
 4. Existing language and formatting conventions in the files being edited.
-5. Existing project utilities, stores, request wrappers, UI/loading patterns, and dependencies that should be reused.
+5. Existing project utilities, stores, request wrappers, API-module organization, UI/loading patterns, and dependencies that should be reused.
 
 ### Existing architecture beats incidental migration
 
@@ -134,15 +135,32 @@ Load `references/state-management.md` when this decision matters.
 
 ### Approved: Axios
 
-Axios is treated as an approved HTTP client for ordinary Web Vue applications.
+Axios is an approved request-layer dependency for Vue and uni-app projects when it fits the actual runtime/project architecture.
 
-- If the project already uses Axios or an Axios-based request wrapper, reuse it.
-- For a new Web Vue app that needs a reusable HTTP client/request layer and has none, Axios may be introduced directly.
-- Prefer a project-owned configured instance rather than scattered ad-hoc clients.
-- Do not replace a working fetch/request layer incidentally.
-- Axios approval does **not** override uni-app platform compatibility.
+Preferred architecture when Axios is used:
 
-For shared uni-app App/mini-program code, prefer `uni.request` or the project's existing cross-platform request wrapper unless Axios compatibility is already established for every required target.
+```text
+utils/request.js
+    -> configured Axios instance + interceptors
+api/<feature>.js
+    -> named semantic endpoint functions
+page/component
+    -> business Promise chain + UI loading/interaction lock
+```
+
+Rules:
+
+- If the project already has an Axios-based `request` wrapper, reuse it.
+- Keep `baseURL`, token/header logic, common interceptors, transport error normalization, serialization, and similar cross-request concerns in the configured request layer.
+- Define endpoint URL/method/params in API/domain modules instead of scattering raw Axios/request configs through pages/components.
+- Business pages/components should normally import semantic API functions and call `listXxx(...).then(...).catch(...).finally(...)`.
+- Respect the request wrapper's resolved response shape. If the interceptor already returns `response.data`, do not unwrap `.data` again in the business layer.
+- Keep operation-specific UI loading locks in the page/component/business layer rather than burying them in a global request interceptor.
+- Do not replace a working request architecture incidentally.
+
+Axios approval is **not limited to H5/Web**. In uni-app, do not reject Axios merely because the target is App or a mini program. Reuse/choose Axios when the actual target/project setup is verified compatible.
+
+Use `uni.request` or a project wrapper around it when a concrete runtime/network capability requires it, when the current Axios setup is actually incompatible, or when multi-target compatibility has not been verified.
 
 Load `references/async-interface-ui.md` and, for uni-app, `references/uni-app-platform.md`.
 
@@ -165,7 +183,7 @@ Do **not** load all core references for every Vue task. Load only references tha
 - SFC/template/style / refs / `v-if` / `v-for` / `v-html` -> `references/sfc.md`
 - props / emits / `v-model` / provide/inject / component refs -> `references/component-data-flow.md`
 - composable design/extraction -> `references/composables.md`
-- UI-triggered API/interface request / Axios -> `references/async-interface-ui.md`
+- UI-triggered API/interface request / Axios / request wrapper -> `references/async-interface-ui.md`
 - shared/global state architecture / Pinia -> `references/state-management.md`
 - uni-app task or platform-sensitive Vue API in uni-app -> **always first** `references/uni-app-platform.md`
 
@@ -251,25 +269,27 @@ When state crosses page/feature boundaries, load `references/state-management.md
 
 When UI triggers an asynchronous request, load `references/async-interface-ui.md`.
 
+- Prefer configured request layer -> named API function -> business/UI call chain.
 - Prefer `.then().catch().finally()` for ordinary interface/API request flow.
-- Reuse the existing request layer.
-- Axios is an approved Web Vue request client.
+- Keep endpoint strings/methods/params out of volatile UI code when a semantic API module is appropriate.
+- Respect normalized response values returned by request interceptors.
 - Guard duplicate handler entry.
 - Lock conflicting UI while pending.
 - Keep unrelated UI available when safe.
 - Release application-level reactive/business locks in `.finally()`.
-- In uni-app, transport choice and native loading/toast ordering follow platform-specific rules.
+- In uni-app, choose Axios vs `uni.request` from actual compatibility instead of a blanket platform split.
 
 ### uni-app
 
 For **every uni-app task**, load `references/uni-app-platform.md` before browser-oriented optional references.
 
 - Identify actual target(s).
-- Do not assume browser DOM/XHR outside H5.
+- Do not assume browser DOM outside H5.
 - Do not introduce ordinary Vue Router/`RouterView` architecture into normal uni-app page routing.
-- Prefer `uni.request`/existing cross-platform request abstraction for shared App/mini-program networking.
+- Do not assume App/mini-program means Axios is unavailable.
+- Reuse a working Axios request layer when the actual target is compatible.
+- Switch to `uni.request` / platform transport when a concrete compatibility or platform-network capability requires it.
 - Gate Vue built-ins and refs by target compatibility.
-- Platform compatibility overrides generic Web Vue references, including the generic Axios allowance.
 
 ## 3. Optional Features — Load Only When Required
 
@@ -326,9 +346,10 @@ Before finishing, verify only what is relevant to the task:
 - component/composable splitting has a real responsibility/reuse/lifecycle benefit
 - data ownership/communication is understandable
 - app-level shared state uses the existing solution or an intentional Pinia boundary
-- Web Vue request code reuses the existing layer or an intentional Axios layer
+- Axios/request code follows the existing request-layer/API-module/business-layer organization where applicable
+- business code respects the request wrapper's resolved response contract
 - UI-triggered async operations have correct loading/interaction locks
-- uni-app platform-sensitive code passed the platform gate and did not assume Axios/XHR portability
+- uni-app transport choice is based on actual compatibility instead of a blanket H5/non-H5 assumption
 - non-approved third-party dependencies were not added merely because an example suggested a capability
 - experimental/optional Vue features were introduced only with explicit need
 - performance work is supported by a real requirement or measured bottleneck
