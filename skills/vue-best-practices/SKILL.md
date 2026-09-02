@@ -1,12 +1,12 @@
 ---
 name: vue-best-practices
-description: MUST be used for Vue.js and uni-app Vue tasks. Defaults to Vue 3 Composition API with `<script setup>` for new code while respecting existing project architecture. Chooses JavaScript, optional JSDoc, or TypeScript by code stability; enforces four-space indentation; uses task-scoped reference loading; avoids incidental dependencies/refactors; and applies explicit uni-app platform gates plus async UI loading locks.
+description: MUST be used for Vue.js and uni-app Vue tasks. Defaults to Vue 3 Composition API with `<script setup>` for new code while respecting existing project architecture. Chooses JavaScript, optional JSDoc, or TypeScript by code stability; enforces four-space indentation; uses task-scoped reference loading; treats Pinia and Axios as approved ecosystem dependencies with platform-aware limits; and applies explicit uni-app platform gates plus async UI loading locks.
 license: MIT
 metadata:
     author: github.com/vuejs-ai
     customized_by: github.com/LingYzh
     upstream_version: "18.0.0"
-    version: "18.4.0-personal.4"
+    version: "18.5.0-personal.5"
 ---
 
 # Vue Best Practices Workflow
@@ -24,7 +24,7 @@ Use this Skill as a decision framework, not as permission to rewrite unrelated p
 - **Make data flow understandable:** use the simplest communication mechanism that keeps ownership clear.
 - **Platform comes before Web assumptions:** uni-app targets must pass the platform compatibility gate before browser-oriented Vue guidance is applied.
 - **Async UI must be guarded:** user-triggered requests need operation-level loading/interaction locks.
-- **Dependencies are explicit architecture decisions:** examples are never authorization to install third-party packages.
+- **Dependencies remain deliberate:** examples are not general authorization to install packages, with explicit approved exceptions for Pinia and Axios under the rules below.
 - **Performance is evidence-driven:** optimize measured hot paths, not magic thresholds from examples.
 
 ## 1. Confirm Context Before Coding
@@ -109,20 +109,55 @@ Keep project-controlled formatting tools aligned when they would otherwise rever
 - ESLint / Vue indentation rules: configure the applicable indentation width to `4`
 - If one formatter is authoritative, disable conflicting formatting rules instead of making tools fight each other
 
-## 1.3 Global Dependency Discipline
+## 1.3 Dependency Discipline and Approved Ecosystem Exceptions
 
-This generic Skill should be **dependency-neutral**.
+The default rule is dependency-conservative: do not install or replace packages merely because an example mentions a capability.
 
-- Do not install, replace, or migrate to a third-party package merely because a reference/example mentions a capability.
-- Prefer native Vue/platform capabilities and dependencies/utilities already present in the project.
-- If the project already uses a third-party library, maintain it according to the project's established conventions; do not promote that library into a generic recommendation.
-- If a new dependency is genuinely required, make it an explicit architectural change with a concrete reason and user/task justification.
-- Third-party-specific best practices belong in a dedicated Skill or project documentation, not in this generic Vue Skill.
-- Placeholder names such as `ProjectVirtualList` or `sanitizeTrustedHtml` represent existing/project-owned abstractions, not packages to install.
+Prefer, in order:
+
+1. existing project infrastructure
+2. native Vue/platform capabilities
+3. an approved ecosystem dependency when it clearly fits the requirement
+4. another new dependency only with an explicit technical reason
+
+### Approved: Pinia
+
+Pinia is treated as the preferred/default Vue app-level state-management solution when a real global state boundary exists.
+
+- If the project already uses Pinia, follow its existing conventions.
+- For a new Vue app that genuinely needs app-level shared state, Pinia may be introduced directly.
+- Do not globalize local/feature state merely because Pinia is available.
+- Do not replace another established store solution incidentally.
+- Apply the normal JS/JSDoc/TS language tiers to stores.
+
+Load `references/state-management.md` when this decision matters.
+
+### Approved: Axios
+
+Axios is treated as an approved HTTP client for ordinary Web Vue applications.
+
+- If the project already uses Axios or an Axios-based request wrapper, reuse it.
+- For a new Web Vue app that needs a reusable HTTP client/request layer and has none, Axios may be introduced directly.
+- Prefer a project-owned configured instance rather than scattered ad-hoc clients.
+- Do not replace a working fetch/request layer incidentally.
+- Axios approval does **not** override uni-app platform compatibility.
+
+For shared uni-app App/mini-program code, prefer `uni.request` or the project's existing cross-platform request wrapper unless Axios compatibility is already established for every required target.
+
+Load `references/async-interface-ui.md` and, for uni-app, `references/uni-app-platform.md`.
+
+### Other third-party libraries
+
+For libraries other than the approved exceptions above:
+
+- do not install them merely because a Skill example could use them
+- reuse an existing project dependency when appropriate
+- make a new dependency an explicit technical decision
+- keep library-specific deep guidance in a dedicated Skill/project document rather than turning this generic Vue Skill into a package catalog
 
 ## 1.4 Load References by Task — Do Not Preload Everything
 
-Do **not** load all core references for every Vue task. Load only the references that materially affect the current work.
+Do **not** load all core references for every Vue task. Load only references that materially affect the current work.
 
 ### Common routing
 
@@ -130,17 +165,11 @@ Do **not** load all core references for every Vue task. Load only the references
 - SFC/template/style / refs / `v-if` / `v-for` / `v-html` -> `references/sfc.md`
 - props / emits / `v-model` / provide/inject / component refs -> `references/component-data-flow.md`
 - composable design/extraction -> `references/composables.md`
-- UI-triggered API/interface request -> `references/async-interface-ui.md`
-- shared/global state architecture -> `references/state-management.md`
+- UI-triggered API/interface request / Axios -> `references/async-interface-ui.md`
+- shared/global state architecture / Pinia -> `references/state-management.md`
 - uni-app task or platform-sensitive Vue API in uni-app -> **always first** `references/uni-app-platform.md`
 
-### When to load multiple references
-
-Load several references when the task genuinely spans several concerns, such as creating a new feature with state, child components, async requests, and composables.
-
-For a tiny edit (text, one condition, one CSS fix), do not consume unrelated references.
-
-Keep only currently relevant references in active working context.
+Load several references only when the task genuinely spans several concerns. For a tiny edit, do not consume unrelated references.
 
 ## 1.5 Plan Component Boundaries Only When the Change Needs It
 
@@ -170,8 +199,6 @@ Do **not** require splitting because:
 - a route view is assumed to be only a thin composition shell
 
 A cohesive business page may intentionally keep related volatile logic/UI together when that makes frequent changes easier.
-
-Do not turn one maintainable feature into many one-use files without a clear boundary.
 
 ## 2. Apply Relevant Vue Foundations
 
@@ -212,26 +239,37 @@ When extraction/design matters, load `references/composables.md`.
 - File length, ref count, or “clean architecture” aesthetics alone are not.
 - Prefer locality for volatile one-off business workflows when extraction would increase navigation cost.
 
+### State management
+
+When state crosses page/feature boundaries, load `references/state-management.md`.
+
+- Keep local state local.
+- Use feature composables for feature-scoped ownership.
+- Use Pinia as the preferred default when a genuine app-level store boundary exists and no competing established architecture should be preserved.
+
 ### Async API/interface calls
 
 When UI triggers an asynchronous request, load `references/async-interface-ui.md`.
 
 - Prefer `.then().catch().finally()` for ordinary interface/API request flow.
+- Reuse the existing request layer.
+- Axios is an approved Web Vue request client.
 - Guard duplicate handler entry.
 - Lock conflicting UI while pending.
 - Keep unrelated UI available when safe.
 - Release application-level reactive/business locks in `.finally()`.
-- In uni-app, native loading/toast ordering follows the platform-specific rule in that reference.
+- In uni-app, transport choice and native loading/toast ordering follow platform-specific rules.
 
 ### uni-app
 
 For **every uni-app task**, load `references/uni-app-platform.md` before browser-oriented optional references.
 
 - Identify actual target(s).
-- Do not assume browser DOM outside H5.
+- Do not assume browser DOM/XHR outside H5.
 - Do not introduce ordinary Vue Router/`RouterView` architecture into normal uni-app page routing.
+- Prefer `uni.request`/existing cross-platform request abstraction for shared App/mini-program networking.
 - Gate Vue built-ins and refs by target compatibility.
-- Platform compatibility overrides generic Web Vue references.
+- Platform compatibility overrides generic Web Vue references, including the generic Axios allowance.
 
 ## 3. Optional Features — Load Only When Required
 
@@ -251,13 +289,13 @@ For **every uni-app task**, load `references/uni-app-platform.md` before browser
 - Async components -> `references/component-async.md`
 - Render functions -> `references/render-functions.md`
 - Plugins -> `references/plugins.md`
-- State management -> `references/state-management.md`
+- State management / Pinia -> `references/state-management.md`
 
 ### Experimental
 
 - Suspense -> `references/component-suspense.md`
 
-Do not introduce Suspense by default; it remains an experimental Vue feature and requires explicit architectural intent plus platform compatibility.
+Do not introduce Suspense by default; it requires explicit architectural intent plus platform compatibility.
 
 ## 4. Performance Comes After Correctness and Evidence
 
@@ -272,7 +310,7 @@ Rules:
 
 - reproduce/measure the problem first when practical
 - do not use arbitrary “N items” or “N components” cutoffs from examples
-- do not install a performance package automatically
+- do not install an unapproved performance package automatically
 - preserve maintainability unless measurement shows the abstraction is materially costly
 
 ## 5. Final Self-Check
@@ -287,8 +325,10 @@ Before finishing, verify only what is relevant to the task:
 - reactive primitives are appropriate (`ref()` is not replaced by `shallowRef()` without reason)
 - component/composable splitting has a real responsibility/reuse/lifecycle benefit
 - data ownership/communication is understandable
+- app-level shared state uses the existing solution or an intentional Pinia boundary
+- Web Vue request code reuses the existing layer or an intentional Axios layer
 - UI-triggered async operations have correct loading/interaction locks
-- uni-app platform-sensitive code passed the platform gate
-- no third-party dependency was added merely because a Skill example suggested a capability
+- uni-app platform-sensitive code passed the platform gate and did not assume Axios/XHR portability
+- non-approved third-party dependencies were not added merely because an example suggested a capability
 - experimental/optional Vue features were introduced only with explicit need
 - performance work is supported by a real requirement or measured bottleneck

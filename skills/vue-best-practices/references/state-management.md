@@ -1,39 +1,40 @@
 ---
 title: State Management Strategy
 impact: HIGH
-impactDescription: State scope should match ownership and runtime lifetime without introducing unnecessary dependencies or SSR leakage
+impactDescription: State scope should match ownership and runtime lifetime; Pinia is the preferred app-level store when a real global state boundary exists
 type: best-practice
-tags: [vue3, state-management, composables, provide-inject, ssr, dependency-discipline]
+tags: [vue3, state-management, composables, pinia, provide-inject, ssr, dependency-discipline]
 ---
 
 # State Management Strategy
 
-Use the lightest state ownership model that fits the actual sharing boundary. Do not install or introduce a state-management dependency merely because state crosses one component boundary.
+Use the lightest state ownership model that fits the actual sharing boundary. Do not move local or feature state into a global store preemptively.
+
+**Pinia is an approved ecosystem dependency in this Skill.** It is Vue's current default/recommended state-management solution and may be selected directly when the application genuinely needs app-level shared state, SSR-safe store ownership, DevTools/action tracing, or a stable cross-feature store contract.
 
 ## Task List
 
 - Keep state local until multiple consumers genuinely need shared ownership
 - Prefer feature-scoped composables for feature state
-- Reuse the project's existing state-management solution when one is already established
-- Do not add a new runtime dependency solely because this reference mentions shared/global state
+- Prefer Pinia when state genuinely crosses feature/page boundaries or requires application-level lifetime
+- Reuse the project's existing state-management solution instead of introducing a competing pattern
+- Do not replace an established store solution as part of an unrelated task
 - Avoid mutable module-level singleton state in SSR/request-scoped runtimes
-- Keep mutations easy to locate; expose explicit actions when shared state becomes complex
+- Keep shared mutations easy to locate
 - Apply the JS / JSDoc / TS stability tiers from the main Skill
 
 ## Choose State Scope Before Choosing a Tool
 
-Use this progression as a decision guide, not as a mandatory migration ladder:
+Use this progression as a decision guide:
 
-1. **Component-local state** — owned by one component or one small component subtree.
-2. **Feature composable** — shared inside one feature or reused by a small set of related components.
-3. **App-level shared state** — genuinely crosses feature boundaries or must survive independent component lifetimes.
-4. **Request-scoped/server state container** — required when SSR or another multi-request runtime must isolate state per request.
+1. **Component-local state** — owned by one component or one small subtree.
+2. **Feature composable** — shared inside one feature or by a small set of related components.
+3. **Pinia / existing app store** — state genuinely crosses feature/page boundaries, must survive independent component lifetimes, or benefits from store tooling and explicit actions.
+4. **Request-scoped store instance** — SSR or another multi-request runtime must isolate mutable state per request/application instance.
 
-The question is **who owns the state and how long it must live**, not which library can be installed.
+The first question is **who owns the state and how long must it live**. Pinia is not a reason to globalize state that is naturally local.
 
 ## Keep Local State Local
-
-Do not promote state to a global store preemptively.
 
 ```vue
 <script setup>
@@ -44,9 +45,9 @@ const draft = ref('')
 </script>
 ```
 
-If only this component or its immediate children need the state, local ownership is usually easier to understand and change.
+If only this component or its immediate children need the state, a global store adds navigation and ownership cost without a clear benefit.
 
-## Use a Feature Composable for Feature-Level Shared State
+## Use a Feature Composable for Feature-Level State
 
 ```js
 // composables/useCart.js
@@ -83,85 +84,90 @@ export function useCart() {
 }
 ```
 
-Do not make a composable global merely by declaring mutable state at module scope unless global lifetime is explicitly intended.
+Do not make a composable global merely by declaring mutable state at module scope unless global lifetime is intentional.
 
-## Reuse Existing Project Infrastructure
+## Prefer Pinia for Genuine App-Level Shared State
 
-If the project already has an established state-management solution:
+For new Vue applications that actually need a global store, Pinia is the preferred default in this Skill.
 
-- follow its existing store/module conventions
-- avoid creating a second competing global-state pattern
-- do not replace it as part of an unrelated feature change
-- use the dedicated Skill or project documentation for that state solution when available
-
-This generic Vue Skill should not prescribe or install a particular third-party state library.
-
-## Avoid Accidental Module Singletons
-
-A module-level reactive object has process/module lifetime, which may be broader than the component or request lifetime.
-
-**RISKY when global lifetime is not explicitly intended:**
+A JavaScript business-oriented store can stay JavaScript:
 
 ```js
-import { reactive } from 'vue'
+// stores/session.js
+import { defineStore } from 'pinia'
 
-export const state = reactive({
-    user: null,
-    permissions: []
+export const useSessionStore = defineStore('session', {
+    state: () => ({
+        user: null,
+        permissions: []
+    }),
+
+    actions: {
+        setUser(user) {
+            this.user = user
+        },
+
+        clearSession() {
+            this.user = null
+            this.permissions = []
+        }
+    }
 })
 ```
 
-For client-only applications, an intentional singleton can be valid, but make that lifetime explicit. For SSR or multi-request runtimes, do not share user/request state through one module singleton.
+Do not convert a business store to TypeScript merely because Pinia supports strong type inference. Apply the normal language-tier rules.
 
-## Use Request-Scoped State in SSR
+Use Pinia especially when one or more of these are true:
 
-Create mutable state per app/request, or use the request-safe state mechanism already established by the project.
+- several unrelated pages/features consume the same state
+- state must survive independent component lifetimes
+- actions/getters make mutation flow easier to trace
+- DevTools/HMR/store inspection materially help development
+- SSR needs a standard per-app store container
+- the project already uses Pinia
 
-```js
-import { reactive, readonly } from 'vue'
+## Do Not Overuse Pinia
 
-export function createRequestState() {
-    const state = reactive({
-        user: null,
-        permissions: []
-    })
+Avoid moving these into Pinia without a concrete reason:
 
-    function setUser(user) {
-        state.user = user
-    }
+- one component's modal visibility
+- transient form fields used by one page
+- local hover/selection state
+- data that is naturally owned by one feature component tree
 
-    return {
-        state: readonly(state),
-        setUser
-    }
-}
-```
+The availability of Pinia does not make every reactive value global.
 
-The important property is **new mutable state per request/app instance**. Do not introduce a package solely to satisfy this example; integrate with the runtime architecture that already exists.
+## Existing Project Infrastructure Wins
+
+If the project already uses Pinia, follow its existing store naming, file placement, setup-store/options-store style, and mutation conventions.
+
+If the project uses another established store solution:
+
+- maintain that solution for ordinary feature work
+- do not introduce Pinia beside it merely because Pinia is preferred for new architecture
+- migrate only when migration itself is an explicit task with a concrete benefit
+
+## SSR / Request Isolation
+
+Do not put user/request state in a mutable module singleton shared across requests.
+
+When using Pinia in SSR, create/use the store container according to the application's SSR framework/bootstrap so each application/request gets the correct isolated state lifetime.
+
+The same principle applies without Pinia: mutable request/user state must not accidentally live for the whole server process.
 
 ## Keep Shared Mutations Traceable
 
-When many consumers can change shared state, prefer explicit actions over arbitrary deep mutation from every consumer.
+For shared app state, prefer explicit actions when they make ownership and mutation flow easier to understand.
 
-```js
-function setCurrentWorkspace(workspace) {
-    state.currentWorkspace = workspace
-}
+Do not turn every trivial local assignment into an action merely for ceremony.
 
-function clearCurrentWorkspace() {
-    state.currentWorkspace = null
-}
-```
+## Dependency Policy for Pinia
 
-This is a maintainability rule, not a requirement to wrap every trivial local assignment in an action.
+Pinia is an explicit exception to the generic dependency-neutral policy:
 
-## Dependency Discipline
+- it may be named directly in this Vue Skill
+- it may be added to a new/existing project when a genuine app-level store requirement exists and no equivalent store is already established
+- adding it does **not** require inventing an extra architecture problem merely to justify the package
+- it still must not be introduced as an incidental replacement for working local state or another established store architecture
 
-Examples in this Skill are conceptual. They are **not permission to add dependencies**.
-
-Before adding any new runtime package for state management:
-
-1. Confirm the project does not already have an equivalent solution.
-2. Confirm native Vue primitives and existing project infrastructure are insufficient for the requirement.
-3. Make the dependency addition an explicit, justified change rather than an incidental refactor.
-4. Keep third-party-specific usage rules in a dedicated Skill or project-level documentation instead of expanding this generic Vue Skill.
+For deep Pinia-specific patterns beyond ordinary store use, prefer dedicated Pinia documentation/Skill rather than expanding this generic reference indefinitely.

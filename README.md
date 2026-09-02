@@ -12,7 +12,7 @@
 
 | Skill | 用途 | Local | Upstream | 同步状态 | 本地状态 |
 | --- | --- | --- | --- | --- | --- |
-| [`vue-best-practices`](./skills/vue-best-practices/) | Vue 3 / Composition API / uni-app Vue 开发实践 | **v18.4.0-personal.4** | **v18.0.0** | 🔵 **Customized** | ✅ **Active** |
+| [`vue-best-practices`](./skills/vue-best-practices/) | Vue 3 / Composition API / uni-app Vue 开发实践 | **v18.5.0-personal.5** | **v18.0.0** | 🔵 **Customized** | ✅ **Active** |
 
 ## Skill Details
 
@@ -23,7 +23,7 @@ Vue 3 开发工作流与最佳实践 Skill。当前个人版本重点关注业�
 - **Local path:** [`skills/vue-best-practices/`](./skills/vue-best-practices/)
 - **Upstream:** [`vuejs-ai/skills`](https://github.com/vuejs-ai/skills/tree/main/skills/vue-best-practices)
 - **Upstream branch:** `main`
-- **Local version:** `18.4.0-personal.4`
+- **Local version:** `18.5.0-personal.5`
 - **Based on upstream version:** `18.0.0`
 - **Sync state:** Customized
 - **License:** MIT
@@ -59,13 +59,15 @@ Vue 3 开发工作流与最佳实践 Skill。当前个人版本重点关注业�
 
 5. **uni-app platform gate**
     - H5/Web, App, and mini-program targets are treated as different runtimes
-    - DOM, routing, refs, Teleport, Transition, KeepAlive, Suspense, and other platform-sensitive guidance must pass compatibility checks first
+    - DOM, routing, refs, networking, Teleport, Transition, KeepAlive, Suspense, and other platform-sensitive guidance must pass compatibility checks first
+    - shared App/mini-program networking normally stays on `uni.request` or the project's existing cross-platform wrapper
 
-6. **Dependency-neutral generic Skill**
-    - examples do not recommend installing runtime third-party libraries
-    - existing project dependencies may be maintained, but this generic Skill does not promote them
-    - new dependencies require an explicit architectural reason
-    - third-party-specific practices belong in separate Skills or project documentation
+6. **Dependency-conservative policy with approved ecosystem exceptions**
+    - Pinia is an approved/default Vue app-level state solution when a genuine global store boundary exists
+    - Axios is an approved HTTP client for ordinary Web Vue applications and may be used for a new request layer when no established layer exists
+    - existing request/store architecture is not replaced incidentally
+    - Axios is not assumed portable to uni-app App/mini-program targets; the uni-app platform gate wins
+    - other third-party libraries still require an explicit technical reason or an existing project dependency
 
 7. **Upstream rule cleanup**
     - primitive state defaults to normal `ref()`; `shallowRef()` is reserved for intentionally shallow/opaque/large root-replacement state
