@@ -13,7 +13,7 @@
 | Skill | 用途 | Local | Upstream | 同步状态 | 本地状态 |
 | --- | --- | --- | --- | --- | --- |
 | [`vue-best-practices`](./skills/vue-best-practices/) | Vue 3 / Composition API / uni-app Vue 开发实践 | **v18.6.0-personal.6** | **v18.0.0** | 🔵 **Customized** | ✅ **Active** |
-| [`grilling`](./skills/grilling/) | 对计划、需求、架构和决策进行多轮追问与压力测试 | **v1.1.0-personal.2** | **unversioned @ 85f83d3** | 🔵 **Customized** | ✅ **Active** |
+| [`grilling`](./skills/grilling/) | 对计划、需求、架构和决策进行追问、压力测试及执行前歧义澄清 | **v1.2.0-personal.3** | **unversioned @ 85f83d3** | 🔵 **Customized** | ✅ **Active** |
 
 ## Skill Details
 
@@ -82,12 +82,12 @@ This Skill is intentionally different from upstream. Upstream version/commit/tre
 
 ### grilling
 
-对计划、需求、架构、工作流和产品决策进行多轮追问与压力测试的 Skill。保留上游 `design tree + frontier + round` 的核心机制，并针对 Agent Ask 工具、长会话、中文沟通和高密度需求梳理进行了个人化。
+对计划、需求、架构、工作流和产品决策进行追问与压力测试，并在执行类任务中对高返工风险歧义进行开工前澄清的 Skill。保留上游 `design tree + frontier + round` 核心机制，同时针对 Agent Ask 工具、执行前澄清、长会话和中文沟通进行了个人化。
 
 - **Local path:** [`skills/grilling/`](./skills/grilling/)
 - **Upstream:** [`mattpocock/skills`](https://github.com/mattpocock/skills/tree/main/skills/productivity/grilling)
 - **Upstream branch:** `main`
-- **Local version:** `1.1.0-personal.2`
+- **Local version:** `1.2.0-personal.3`
 - **Upstream version:** unversioned
 - **Sync state:** Customized
 - **License:** MIT
@@ -99,37 +99,48 @@ This Skill is intentionally different from upstream. Upstream version/commit/tre
 
 #### Current customizations
 
-1. **Plain-language frontier rounds**
-    - use the user's language and keep every question easy to scan
-    - one underlying decision per question; avoid unnecessary jargon and increasingly dense wording in later rounds
-    - ask the whole currently-answerable material frontier rather than artificially limiting each round
+1. **Two activation modes**
+    - explicit Grill / stress-test / requirement-clarification requests run the full material design tree
+    - normal planning/execution tasks run only a short preflight when unresolved ambiguity could materially change scope, behavior, architecture, irreversible actions, or acceptance criteria
+    - merely mentioning a plan/design/requirement is not enough to trigger the Skill
+    - execution preflight resumes the original task automatically once the blocking material ambiguity is resolved
 
-2. **Recommendation-led decisions**
+2. **Materiality-based questioning**
+    - ask when different reasonable answers would meaningfully change the result or create significant rework
+    - facts, cheap reversible details, naming, formatting, and choices already covered by project/user conventions are not separate user questions
+    - uncertainty by itself is not a reason to ask
+
+3. **Plain-language, recommendation-led decisions**
+    - use the user's language and keep every question easy to scan
+    - one underlying decision per question; avoid unnecessary jargon
     - every material question gets one concrete recommended answer with a short reason
     - settled user policies, existing project behavior, and user-designated reference implementations are strong recommendation defaults
-    - do not manufacture a new architecture choice when an existing convention already answers a low-value implementation detail
 
-3. **Facts are researched, not delegated back to the user**
+4. **Facts are researched, not delegated back to the user**
     - inspect code, files, docs, connected tools, and current external facts before asking
     - only ask the user for real decisions/preferences or facts that only the user can know
-    - unresolved research blocks only dependent branches, not the rest of the frontier
+    - unresolved research blocks only dependent branches, not unrelated work
 
-4. **Ask-tool-first interaction**
+5. **Ask-tool-first interaction**
     - when the host Agent exposes an Ask/AskUserQuestion-style tool, use it instead of rendering chat questionnaires
     - use single-select by default; use multi-select only for genuinely additive choices
     - rely on the host UI's custom/free-text answer path instead of inventing a fake `Other` option when the UI already provides one
     - fill each Ask invocation with as many independent frontier questions as the host schema comfortably supports
     - plain-text A/B/C questions and compact batch replies are fallback behavior only when no usable Ask tool exists
 
-5. **Decision ledger and conflict handling**
+6. **No decorative emoji**
+    - question titles, options, recommendations, checkpoints, summaries, and text fallbacks do not add decorative emoji/pictograms
+    - emoji is used only when the content itself requires it or literal user content must be preserved
+
+7. **Decision ledger and conflict handling**
     - preserve settled answers and do not repeatedly ask the same decision in narrower forms
     - if a later answer conflicts with a settled policy, point out the conflict and reopen only the affected branch
-    - long sessions use compact decision checkpoints to reduce decision loss from context compression
+    - long explicit Grill sessions use compact decision checkpoints to reduce decision loss from context compression
 
-6. **Material completeness without over-grilling**
-    - no material branch may remain silently assumed
-    - facts, reversible details covered by existing conventions, low-impact hypothetical edges, and decisions implied by prior policies do not deserve separate questions
-    - the session ends only when the material frontier is empty and the user confirms the final shared understanding
+8. **Material completeness without over-grilling**
+    - explicit Grill mode leaves no material branch silently assumed
+    - execution preflight asks only questions that block or substantially change the current task
+    - low-impact hypothetical edges and decisions implied by prior policies do not deserve separate questions
 
 ## Status Legend
 
