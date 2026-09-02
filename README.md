@@ -13,6 +13,7 @@
 | Skill | 用途 | Local | Upstream | 同步状态 | 本地状态 |
 | --- | --- | --- | --- | --- | --- |
 | [`vue-best-practices`](./skills/vue-best-practices/) | Vue 3 / Composition API / uni-app Vue 开发实践 | **v18.6.0-personal.6** | **v18.0.0** | 🔵 **Customized** | ✅ **Active** |
+| [`grilling`](./skills/grilling/) | 对计划、需求、架构和决策进行多轮追问与压力测试 | **v1.0.0-personal.1** | **unversioned @ 85f83d3** | 🔵 **Customized** | ✅ **Active** |
 
 ## Skill Details
 
@@ -79,6 +80,54 @@ Vue 3 开发工作流与最佳实践 Skill。当前个人版本重点关注业�
 
 This Skill is intentionally different from upstream. Upstream version/commit/tree information above is retained as the baseline for future comparison and selective rebasing.
 
+### grilling
+
+对计划、需求、架构、工作流和产品决策进行多轮追问与压力测试的 Skill。保留上游 `design tree + frontier + round` 的核心机制，并针对长会话、中文沟通和高密度需求梳理进行了个人化。
+
+- **Local path:** [`skills/grilling/`](./skills/grilling/)
+- **Upstream:** [`mattpocock/skills`](https://github.com/mattpocock/skills/tree/main/skills/productivity/grilling)
+- **Upstream branch:** `main`
+- **Local version:** `1.0.0-personal.1`
+- **Upstream version:** unversioned
+- **Sync state:** Customized
+- **License:** MIT
+- **Upstream baseline commit:** `85f83d3fde1d3a90d5c9a657f6998c79a6c37308`
+- **Upstream baseline SKILL.md blob:** `8ca78c6d8f901aab0c5a1f896034b70e666ff2a3`
+- **Upstream baseline agents/openai.yaml blob:** `ddbdb96139c0c1dfe6bca698f39d0465674b8a39`
+- **Imported and customized:** 2026-09-02
+- **Last local review:** 2026-09-02
+
+#### Current customizations
+
+1. **Plain-language frontier rounds**
+    - use the user's language and keep every question easy to scan
+    - one underlying decision per question; avoid unnecessary jargon and increasingly dense wording in later rounds
+    - ask the whole currently-answerable material frontier rather than artificially limiting each round
+
+2. **Recommendation-led decisions**
+    - every material question gets one concrete recommended answer with a short reason
+    - settled user policies, existing project behavior, and user-designated reference implementations are strong recommendation defaults
+    - do not manufacture a new architecture choice when an existing convention already answers a low-value implementation detail
+
+3. **Facts are researched, not delegated back to the user**
+    - inspect code, files, docs, connected tools, and current external facts before asking
+    - only ask the user for real decisions/preferences or facts that only the user can know
+    - unresolved research blocks only dependent branches, not the rest of the frontier
+
+4. **Batch-answer support**
+    - accept compact replies such as `Q1 B, Q2 按推荐` or `除 Q5 外其余按推荐`
+    - settle clear batch answers without forcing the user to restate every choice
+
+5. **Decision ledger and conflict handling**
+    - preserve settled answers and do not repeatedly ask the same decision in narrower forms
+    - if a later answer conflicts with a settled policy, point out the conflict and reopen only the affected branch
+    - long sessions use compact decision checkpoints to reduce decision loss from context compression
+
+6. **Material completeness without over-grilling**
+    - no material branch may remain silently assumed
+    - facts, reversible details covered by existing conventions, low-impact hypothetical edges, and decisions implied by prior policies do not deserve separate questions
+    - the session ends only when the material frontier is empty and the user confirms the final shared understanding
+
 ## Status Legend
 
 | 状态 | 含义 |
@@ -94,7 +143,7 @@ This Skill is intentionally different from upstream. Upstream version/commit/tre
 为了避免“版本号相同但内容已经不同”的情况，本仓库尽量同时记录：
 
 1. Skill 自身的本地版本号；
-2. 它所基于的上游版本；
+2. 它所基于的上游版本、revision 或 commit；
 3. 上游仓库与分支；
 4. 上游基线的 commit / tree / blob 信息；
 5. 当前本地定制内容；
@@ -108,11 +157,13 @@ This Skill is intentionally different from upstream. Upstream version/commit/tre
 my-skills-collections/
 ├── README.md
 └── skills/
+    ├── grilling/
+    │   ├── SKILL.md
+    │   └── agents/
+    │       └── openai.yaml
     └── vue-best-practices/
         ├── SKILL.md
         └── references/
-            ├── async-interface-ui.md
-            ├── uni-app-platform.md
             └── ...
 ```
 
@@ -125,3 +176,4 @@ my-skills-collections/
 当前收录的第三方 Skill：
 
 - `vue-best-practices` — [`vuejs-ai/skills`](https://github.com/vuejs-ai/skills) — MIT
+- `grilling` — [`mattpocock/skills`](https://github.com/mattpocock/skills) — MIT
