@@ -180,3 +180,75 @@ PowerShell accepts both `/` and `\`. CMD generally requires `\` or quoted paths.
 
 - PowerShell: `[Environment]::SetEnvironmentVariable('NAME', 'value', 'User')` persists.
 - CMD: `setx NAME value` persists (but truncates values over 1024 characters).
+
+
+## Encoding compatibility pitfalls
+
+### Do not assume locale equals encoding
+
+A Windows locale or visible language is only a clue. It does not prove the encoding of a file or native program.
+
+Common East Asian legacy code pages include:
+
+- CP932: Japanese / Shift-JIS family
+- CP936: Simplified Chinese legacy Windows text (commonly called GBK in practice)
+- CP949: Korean
+- CP950: Traditional Chinese / Big5 family
+- CP65001: UTF-8
+
+A Simplified Chinese Windows host can still run a CP932 Japanese tool and edit UTF-8 files at the same time.
+
+### PowerShell 5.1 and 7+ differ
+
+Do not treat `-Encoding UTF8` as version-neutral:
+
+- Windows PowerShell 5.1: `UTF8` writes UTF-8 with BOM.
+- PowerShell 7+: `utf8` / `utf8NoBOM` are UTF-8 without BOM by default.
+- PowerShell 6.2+: registered numeric code-page IDs can be supplied to `-Encoding`.
+- PowerShell 7.4+: `-Encoding ansi` maps to the current culture's ANSI code page.
+
+If a `.ps1` must run in Windows PowerShell 5.1 and contains non-ASCII literals, UTF-8 with BOM is usually the safer UTF-8 form.
+
+### Do not use `chcp` as a universal fix
+
+`chcp` changes the active console code page. It does not rewrite file encodings and does not define every native application's protocol. Programs started before a code-page change may continue using the original code page.
+
+Inspect first:
+
+```powershell
+$PSVersionTable.PSVersion
+[System.Globalization.CultureInfo]::CurrentCulture.TextInfo.ANSICodePage
+[System.Globalization.CultureInfo]::CurrentCulture.TextInfo.OEMCodePage
+[Console]::InputEncoding.CodePage
+[Console]::OutputEncoding.CodePage
+$OutputEncoding.CodePage
+```
+
+### Scope `$OutputEncoding` changes
+
+`$OutputEncoding` controls text PowerShell pipes into native applications. It does not set file encoding.
+
+If a known legacy tool requires a specific stdin code page, change it temporarily and restore it:
+
+```powershell
+$oldOutputEncoding = $OutputEncoding
+
+try {
+    $OutputEncoding = [System.Text.Encoding]::GetEncoding(936)
+    '中文输入' | legacy-tool.exe
+}
+finally {
+    $OutputEncoding = $oldOutputEncoding
+}
+```
+
+Use the target executable's actual encoding contract. Do not pick CP936 only because the Windows installation is Simplified Chinese.
+
+### Never silently migrate project files
+
+When editing an existing text file:
+
+1. Preserve its current encoding if practical.
+2. If the encoding is uncertain, detect or inspect before writing.
+3. Treat conversion to UTF-8/another encoding as an explicit migration.
+4. Verify that downstream compilers, scripts, services, and legacy tools accept the new encoding.

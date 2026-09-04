@@ -14,7 +14,7 @@
 | --- | --- | --- | --- | --- | --- |
 | [`vue-best-practices`](./skills/vue-best-practices/) | Vue 3 / Composition API / uni-app Vue 开发实践 | **v18.6.0-personal.6** | **v18.0.0** | 🔵 **Customized** | ✅ **Active** |
 | [`grilling`](./skills/grilling/) | 需求/方案压力测试与执行前高返工风险歧义澄清 | **v1.2.0-personal.3** | **unversioned @ 85f83d3** | 🔵 **Customized** | ✅ **Active** |
-| [`powershell-windows-cli`](./skills/powershell-windows-cli/) | PowerShell 7 / Windows PowerShell 5.1 / CMD Agent 使用规范 | **v1.0.0-snapshot.1** | **snapshot @ 90a5953** | 🟢 **Snapshot** | ✅ **Active** |
+| [`powershell-windows-cli`](./skills/powershell-windows-cli/) | PowerShell / CMD 与 Windows 编码兼容、native CLI 使用规范 | **v1.1.0-personal.1** | **snapshot @ 90a5953** | 🔵 **Customized** | ✅ **Active** |
 
 ## Installation
 
@@ -68,7 +68,7 @@ GitHub tag `v*` 会触发 Release workflow，从根 `skills/<name>/` 分别生�
 ```text
 grilling-1.2.0-personal.3.zip
 vue-best-practices-18.6.0-personal.6.zip
-powershell-windows-cli-1.0.0-snapshot.1.zip
+powershell-windows-cli-1.1.0-personal.1.zip
 SHA256SUMS.txt
 ```
 
@@ -115,15 +115,15 @@ references/
 
 - **Local path:** [`skills/powershell-windows-cli/`](./skills/powershell-windows-cli/)
 - **Upstream:** [`UncertaintyDeterminesYou4ndMe/powershell-windows-cli-agent-skill`](https://github.com/UncertaintyDeterminesYou4ndMe/powershell-windows-cli-agent-skill)
-- **Local version:** `1.0.0-snapshot.1`
+- **Local version:** `1.1.0-personal.1`
 - **Upstream version:** unversioned
-- **Sync state:** Snapshot
+- **Sync state:** Customized
 - **License:** MIT
 - **Upstream baseline commit:** `90a59539db1d7b4406a32cd7b337e76bbe7d6a3c`
 - **Upstream baseline SKILL.md blob:** `7c9d88617131f09b83502533b7a839dc0083650e`
 - **Upstream baseline references tree:** `1437dca59e89040a467a3247f2b9956cc02cb240`
 
-当前仅做分发适配：保留上游 Skill 正文、references、helper scripts 与 evals，补充本仓库版本 metadata 和 Codex / Claude plugin manifest；尚未开始个人化审计。
+主要个人化方向：以 Windows 文本编码边界为核心，区分 PowerShell 5.1/7+、脚本源文件、普通文件、Console、PowerShell→native stdin 与 native stdout/stderr；重点兼容 UTF-8/BOM 与 CP932/936/949/950，默认保留 legacy 项目文件编码，禁止用 `chcp` 或系统 locale 作为万能编码判断；同时补强 native executable 参数边界、`$LASTEXITCODE`、`$OutputEncoding` 作用域以及 `-WhatIf`/native dry-run 的区别。
 
 ## Distribution Architecture
 

@@ -8,6 +8,7 @@ This script does NOT execute PowerShell. It performs text-level checks for:
 - Overly permissive execution policies
 - Missing error handling patterns
 - Suspicious path/quoting issues
+- Risky console/code-page and native encoding changes
 
 Limitations: this is regex-based preflight linting, not semantic analysis. It cannot
 detect obfuscated code, runtime values, or AST-level issues. Use PSScriptAnalyzer
@@ -294,6 +295,95 @@ def check_quoting(code: str) -> list[dict]:
     return findings
 
 
+
+def check_encoding_changes(code: str) -> list[dict]:
+    """Warn about broad encoding changes that are easy to misuse on Windows."""
+    findings = []
+
+    for line_no, line in enumerate(code.splitlines(), start=1):
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            continue
+
+        if re.search(r"\bchcp(?:\.com)?\s+\d+", stripped, re.IGNORECASE):
+            findings.append(
+                {
+                    "line": line_no,
+                    "line_text": stripped,
+                    "type": "console_code_page_change",
+                    "message": (
+                        "chcp changes the active console code page only. "
+                        "Do not use it as a universal fix for file or native-tool encoding."
+                    ),
+                }
+            )
+
+    changes_output_encoding = bool(
+        re.search(r"\$OutputEncoding\s*=", code, re.IGNORECASE)
+    )
+    saves_output_encoding = bool(
+        re.search(r"\$\w*OutputEncoding\w*\s*=\s*\$OutputEncoding", code, re.IGNORECASE)
+    )
+    restores_in_finally = bool(
+        re.search(
+            r"finally\s*\{[\s\S]*?\$OutputEncoding\s*=\s*\$\w*OutputEncoding\w*",
+            code,
+            re.IGNORECASE,
+        )
+    )
+
+    if changes_output_encoding and not (saves_output_encoding and restores_in_finally):
+        findings.append(
+            {
+                "line": None,
+                "line_text": None,
+                "type": "unscoped_output_encoding_change",
+                "message": (
+                    "$OutputEncoding controls PowerShell -> native stdin encoding. "
+                    "Scope temporary changes and restore the previous value in finally."
+                ),
+            }
+        )
+
+    changes_console_encoding = bool(
+        re.search(
+            r"\[Console\]::(?:InputEncoding|OutputEncoding)\s*=",
+            code,
+            re.IGNORECASE,
+        )
+    )
+    if changes_console_encoding and "finally" not in code.lower():
+        findings.append(
+            {
+                "line": None,
+                "line_text": None,
+                "type": "unscoped_console_encoding_change",
+                "message": (
+                    "Changing Console InputEncoding/OutputEncoding is session state. "
+                    "Prefer a narrow, reversible change tied to a known native protocol."
+                ),
+            }
+        )
+
+    if re.search(
+        r"\$PSDefaultParameterValues\s*\[[^\]]*Encoding[^\]]*\]\s*=",
+        code,
+        re.IGNORECASE,
+    ):
+        findings.append(
+            {
+                "line": None,
+                "line_text": None,
+                "type": "global_encoding_default_change",
+                "message": (
+                    "Changing $PSDefaultParameterValues for Encoding can affect many commands. "
+                    "Prefer explicit per-boundary encoding unless a session-wide policy is intentional."
+                ),
+            }
+        )
+
+    return findings
+
 def validate(code: str) -> dict:
     """Run all checks and return a structured report."""
     findings = []
@@ -304,6 +394,7 @@ def validate(code: str) -> dict:
     findings.extend(check_error_handling(code))
     findings.extend(check_suspicious_patterns(code))
     findings.extend(check_quoting(code))
+    findings.extend(check_encoding_changes(code))
 
     dangerous = [f for f in findings if f["type"] == "dangerous_cmdlet"]
 

@@ -189,3 +189,22 @@ if %errorlevel% neq 0 (
 3. **Null / empty**: PowerShell has `$null`; CMD empty string is `""`.
 4. **Boolean**: PowerShell uses `$true`/`$false`; CMD has no native boolean.
 5. **Comments**: PowerShell uses `#`. CMD uses `REM` or `::` (inside blocks `::` can fail, prefer `REM`).
+
+
+## Encoding boundaries across PowerShell, CMD, and native tools
+
+PowerShell's object pipeline is not the same as a native text pipeline. Encoding becomes relevant when text crosses a byte-oriented boundary.
+
+| Boundary | Main concern |
+|---|---|
+| PowerShell object -> PowerShell object | Normally Unicode/.NET objects; no legacy code page is needed |
+| File -> PowerShell string | Decode using the file's actual encoding |
+| PowerShell string -> file | Encode using the required/preserved file encoding |
+| PowerShell -> native stdin | Controlled by `$OutputEncoding` |
+| Native stdout/stderr -> PowerShell | Depends on the native program and host/PowerShell decoding behavior |
+| CMD/`.bat` console text | Active console/OEM code-page behavior matters |
+| `chcp` | Changes active console code page, not file encoding |
+
+Before changing a console code page, check whether the problem is really the console. A UTF-8 file, CP932 native tool, and CP936 Windows locale can coexist.
+
+For detailed rules and East Asian code-page examples, load `windows-text-encoding.md`.
