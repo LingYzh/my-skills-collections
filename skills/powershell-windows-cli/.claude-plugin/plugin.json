@@ -1,0 +1,23 @@
+{
+    "name": "powershell-windows-cli",
+    "displayName": "PowerShell + Windows CLI",
+    "version": "1.0.0-snapshot.1",
+    "description": "PowerShell 7 / Windows PowerShell 5.1 and CMD/Batch guidance for AI agents, with Windows-specific safety and troubleshooting patterns.",
+    "author": {
+        "name": "LingYzh",
+        "url": "https://github.com/LingYzh"
+    },
+    "homepage": "https://github.com/LingYzh/my-skills-collections",
+    "repository": "https://github.com/LingYzh/my-skills-collections",
+    "license": "MIT",
+    "keywords": [
+        "agent-skills",
+        "powershell",
+        "windows",
+        "cmd",
+        "claude-code"
+    ],
+    "skills": [
+        "./"
+    ]
+}

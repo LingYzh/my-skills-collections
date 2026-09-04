@@ -6,7 +6,7 @@
 
 > 本仓库不是各上游项目的官方镜像。Customized Skill 的行为可能与上游不同。
 
-**Last status check:** 2026-09-02
+**Last status check:** 2026-09-04
 
 ## Skills
 
@@ -14,6 +14,7 @@
 | --- | --- | --- | --- | --- | --- |
 | [`vue-best-practices`](./skills/vue-best-practices/) | Vue 3 / Composition API / uni-app Vue 开发实践 | **v18.6.0-personal.6** | **v18.0.0** | 🔵 **Customized** | ✅ **Active** |
 | [`grilling`](./skills/grilling/) | 需求/方案压力测试与执行前高返工风险歧义澄清 | **v1.2.0-personal.3** | **unversioned @ 85f83d3** | 🔵 **Customized** | ✅ **Active** |
+| [`powershell-windows-cli`](./skills/powershell-windows-cli/) | PowerShell 7 / Windows PowerShell 5.1 / CMD Agent 使用规范 | **v1.0.0-snapshot.1** | **snapshot @ 90a5953** | 🟢 **Snapshot** | ✅ **Active** |
 
 ## Installation
 
@@ -30,6 +31,7 @@ codex plugin marketplace add LingYzh/my-skills-collections --ref master
 ```bash
 codex plugin add grilling@lingyzh-skills
 codex plugin add vue-best-practices@lingyzh-skills
+codex plugin add powershell-windows-cli@lingyzh-skills
 ```
 
 ### Claude Code Plugin Marketplace
@@ -45,6 +47,7 @@ claude plugin marketplace add LingYzh/my-skills-collections@master
 ```bash
 claude plugin install grilling@lingyzh-skills
 claude plugin install vue-best-practices@lingyzh-skills
+claude plugin install powershell-windows-cli@lingyzh-skills
 ```
 
 Claude Code 交互界面也可使用：
@@ -53,6 +56,7 @@ Claude Code 交互界面也可使用：
 /plugin marketplace add LingYzh/my-skills-collections
 /plugin install grilling@lingyzh-skills
 /plugin install vue-best-practices@lingyzh-skills
+/plugin install powershell-windows-cli@lingyzh-skills
 ```
 
 插件内 Skill 会使用宿主的 plugin namespace；启用哪个插件，就只引入对应 Skill。
@@ -64,6 +68,7 @@ GitHub tag `v*` 会触发 Release workflow，从根 `skills/<name>/` 分别生�
 ```text
 grilling-1.2.0-personal.3.zip
 vue-best-practices-18.6.0-personal.6.zip
+powershell-windows-cli-1.0.0-snapshot.1.zip
 SHA256SUMS.txt
 ```
 
@@ -106,6 +111,20 @@ references/
 
 主要个人化方向：Ask-tool-first、完整 Grill 与执行前 preflight 双模式、只询问 material ambiguity、每题给推荐、事实自己查、决策 ledger、长会话 checkpoint，以及禁止非必要装饰 emoji。
 
+### powershell-windows-cli
+
+- **Local path:** [`skills/powershell-windows-cli/`](./skills/powershell-windows-cli/)
+- **Upstream:** [`UncertaintyDeterminesYou4ndMe/powershell-windows-cli-agent-skill`](https://github.com/UncertaintyDeterminesYou4ndMe/powershell-windows-cli-agent-skill)
+- **Local version:** `1.0.0-snapshot.1`
+- **Upstream version:** unversioned
+- **Sync state:** Snapshot
+- **License:** MIT
+- **Upstream baseline commit:** `90a59539db1d7b4406a32cd7b337e76bbe7d6a3c`
+- **Upstream baseline SKILL.md blob:** `7c9d88617131f09b83502533b7a839dc0083650e`
+- **Upstream baseline references tree:** `1437dca59e89040a467a3247f2b9956cc02cb240`
+
+当前仅做分发适配：保留上游 Skill 正文、references、helper scripts 与 evals，补充本仓库版本 metadata 和 Codex / Claude plugin manifest；尚未开始个人化审计。
+
 ## Distribution Architecture
 
 ```text
@@ -113,6 +132,13 @@ skills/
 ├── grilling/
 │   ├── SKILL.md
 │   ├── agents/
+│   ├── .codex-plugin/plugin.json
+│   └── .claude-plugin/plugin.json
+├── powershell-windows-cli/
+│   ├── SKILL.md
+│   ├── references/
+│   ├── scripts/
+│   ├── evals/
 │   ├── .codex-plugin/plugin.json
 │   └── .claude-plugin/plugin.json
 └── vue-best-practices/
@@ -152,6 +178,7 @@ Release tag 是**收藏仓库版本**，Skill 自己继续使用各自 frontmatt
 | 状态 | 含义 |
 | --- | --- |
 | 🟢 **Exact snapshot** | 本地 Skill 与记录的上游版本完全一致 |
+| 🟢 **Snapshot** | 上游 Skill 内容保持不变，仅增加本仓库分发 metadata / host manifest |
 | 🔵 **Customized** | 基于上游版本进行了有意的本地修改 |
 | 🟠 **Upstream updated** | 上游已有新版本或内容，本地尚未选择性吸收 |
 | ⚪ **Local only** | 自建 Skill，没有对应上游来源 |
@@ -161,5 +188,6 @@ Release tag 是**收藏仓库版本**，Skill 自己继续使用各自 frontmatt
 
 - `vue-best-practices` — [`vuejs-ai/skills`](https://github.com/vuejs-ai/skills) — MIT
 - `grilling` — [`mattpocock/skills`](https://github.com/mattpocock/skills) — MIT
+- `powershell-windows-cli` — [`UncertaintyDeterminesYou4ndMe/powershell-windows-cli-agent-skill`](https://github.com/UncertaintyDeterminesYou4ndMe/powershell-windows-cli-agent-skill) — MIT
 
 第三方 Skill 的原作者、来源和许可证归各自上游项目所有；本仓库保留来源与上游基线信息，以便后续选择性同步。

@@ -1,0 +1,31 @@
+{
+    "name": "powershell-windows-cli",
+    "version": "1.0.0-snapshot.1",
+    "description": "PowerShell 7 / Windows PowerShell 5.1 and CMD/Batch guidance for AI agents, with Windows-specific safety and troubleshooting patterns.",
+    "author": {
+        "name": "LingYzh",
+        "url": "https://github.com/LingYzh"
+    },
+    "homepage": "https://github.com/LingYzh/my-skills-collections",
+    "repository": "https://github.com/LingYzh/my-skills-collections",
+    "license": "MIT",
+    "keywords": [
+        "agent-skills",
+        "powershell",
+        "windows",
+        "cmd",
+        "codex"
+    ],
+    "skills": "./",
+    "interface": {
+        "displayName": "PowerShell + Windows CLI",
+        "shortDescription": "Correct PowerShell and Windows CLI patterns for agents",
+        "longDescription": "Teach agents to use PowerShell 7, Windows PowerShell 5.1, and CMD/Batch with Windows-native object, safety, path, registry, service, networking, and error-handling patterns.",
+        "developerName": "LingYzh",
+        "category": "Developer Tools",
+        "websiteURL": "https://github.com/LingYzh/my-skills-collections",
+        "defaultPrompt": [
+            "Use powershell-windows-cli for PowerShell, Windows CLI, CMD/Batch, and Windows shell execution tasks."
+        ]
+    }
+}
