@@ -1,23 +1,22 @@
 # Native Command Execution from PowerShell
 
-Use this reference when PowerShell launches `.exe`, `.cmd`, `.bat`, package managers, compilers, Git, Python, Node, .NET tools, or other native programs.
+Use this reference when PowerShell launches `.exe`, `.cmd`, `.bat`, package managers, compilers, Git, Python, Node, .NET tools, or another shell.
 
-## Distinguish PowerShell commands from native programs
+## First identify the boundary
 
-PowerShell cmdlets participate in PowerShell parameter binding, error streams, and common parameters.
+Before choosing syntax, classify the target:
 
-Native programs receive command-line arguments and byte/text streams according to their own contracts. Do not append PowerShell-only parameters such as `-WhatIf` to native programs unless that program independently defines such a flag.
+- PowerShell cmdlet/function/script;
+- native executable;
+- `cmd.exe` built-in or batch file;
+- nested `pwsh` / `powershell.exe`;
+- script host such as `cscript.exe` / `wscript.exe`.
 
-## Prefer argument boundaries over command strings
+Every extra shell layer adds another parser and may add another encoding boundary. Avoid layers that are not required.
 
-Avoid:
+## Prefer direct native invocation
 
-```powershell
-$command = "git commit -m `"$message`""
-Invoke-Expression $command
-```
-
-Prefer:
+For ordinary executables, prefer separate PowerShell arguments:
 
 ```powershell
 $gitArgs = @(
@@ -33,29 +32,168 @@ if ($LASTEXITCODE -ne 0) {
 }
 ```
 
-This reduces quoting errors for spaces, non-ASCII text, JSON, and shell metacharacters.
+Do not build one executable command string and feed it to `Invoke-Expression`.
+
+Direct invocation is especially valuable for values containing spaces, non-ASCII text, JSON, quotes, or shell metacharacters.
+
+## PowerShell 7.3 native argument passing
+
+PowerShell 7.3 changed native argument passing and introduced:
+
+```powershell
+$PSNativeCommandArgumentPassing
+```
+
+Valid modes:
+
+- `Legacy`: historical behavior;
+- `Standard`: newer argument-passing behavior;
+- `Windows`: Windows default.
+
+On Windows, `Windows` behaves like `Standard` for most native executables but uses `Legacy` behavior for compatibility when invoking targets such as `cmd.exe`, `cscript.exe`, `wscript.exe`, `find.exe`, `sqlcmd.exe`, and files ending in `.bat`, `.cmd`, `.js`, `.vbs`, or `.wsf`.
+
+Do not globally force `Legacy` or `Standard` just to fix one command. If an override is truly required, scope it narrowly and restore it.
+
+Windows PowerShell 5.1 predates these modes and uses legacy native argument behavior. Complex quoting that works in PowerShell 7.3+ may need different handling in 5.1.
+
+## Start-Process is process control, not argv preservation
+
+`Start-Process -ArgumentList` accepts an array, but PowerShell joins those elements into one command-line string before starting the process.
+
+Therefore do not use this as the default "safe argument array" pattern:
+
+```powershell
+Start-Process -FilePath 'tool.exe' -ArgumentList '--name', $value
+```
+
+If `$value` contains spaces or quotes, quoting must still match the target parser.
+
+Use `Start-Process` when you actually need its process-control features:
+
+- `-Verb RunAs` / elevation;
+- credentials;
+- a new window;
+- waiting;
+- standard-stream redirection;
+- environment/process-start options.
+
+For direct command execution, `& $exe @args` is normally clearer.
+
+On modern .NET runtimes, `System.Diagnostics.ProcessStartInfo.ArgumentList` is a distinct structured argument collection that escapes arguments when creating the final command line. Feature-detect it; Windows PowerShell 5.1's .NET Framework environment should not be assumed to provide it.
+
+## CMD and batch are string boundaries
+
+On Windows, parameters passed to batch files are ultimately passed as raw command-line strings to `cmd.exe`.
+
+This means:
+
+- PowerShell parsing happens first;
+- CMD parsing may happen second;
+- `%`, `!`, `^`, `&`, `|`, `<`, `>`, parentheses and quotes can gain new meanings;
+- delayed expansion can introduce yet another interpretation of `!`.
+
+Do not route ordinary executable calls through `cmd /c`:
+
+```powershell
+# Avoid
+cmd /c "git status --short"
+
+# Prefer
+& git @('status', '--short')
+```
+
+Use `cmd /c` only when CMD semantics are actually required.
+
+For untrusted or complex dynamic values, avoid batch/CMD string boundaries when a structured executable/API alternative exists.
+
+## Stop-parsing token --%
+
+The Windows-only stop-parsing token is useful for mostly static native syntax that PowerShell would otherwise interpret.
+
+```powershell
+icacls X:\VMS --% /grant Dom\HVAdmin:(CI)(OI)F
+```
+
+After `--%`, PowerShell treats the rest of that command mostly literally. Normal PowerShell variables and subexpressions are not a practical dynamic-composition mechanism there.
+
+Important limitations:
+
+- scope ends at newline or pipeline;
+- PowerShell line continuation does not extend it;
+- ordinary PowerShell stream redirection after it is passed to the native tool rather than interpreted normally;
+- only Windows-style `%ENVVAR%` substitution is specially supported.
+
+Use it as an escape hatch for static syntax, not as the default native invocation style.
+
+## The -- token is different
+
+PowerShell's end-of-parameters token `--` applies to PowerShell commands.
+
+When used with an external executable, `--` is simply passed to that executable. Whether it has meaning depends on the target program.
+
+Do not confuse `--` with `--%`.
+
+## JSON and complex text arguments
+
+Prefer a single explicit boundary.
+
+Example:
+
+```powershell
+$json = $payload | ConvertTo-Json -Compress
+
+$args = @(
+    '--payload'
+    $json
+)
+
+& tool.exe @args
+```
+
+If the target supports stdin or an input file, those can be more robust for large JSON/documents than multi-layer shell quoting.
+
+Do not manually build strings such as:
+
+```powershell
+cmd /c "tool.exe --payload \"{...}\""
+```
+
+unless CMD is genuinely required and the quoting has been verified for that exact target.
+
+## Nested PowerShell
+
+For reusable or multi-line work, prefer a script file with parameters:
+
+```powershell
+pwsh -NoProfile -File .\task.ps1 -Name $name
+```
+
+rather than embedding a large dynamically constructed `pwsh -Command "..."` string.
+
+Every nested `-Command` adds another PowerShell parser and another round of quote/interpolation decisions.
+
+For one short trusted command, `-Command` can be reasonable. Do not turn it into the default transport for complex dynamic data.
 
 ## Native exit codes
 
 `$ErrorActionPreference = 'Stop'` is not a universal substitute for native exit-code handling.
 
-After a native tool whose exit status matters:
-
 ```powershell
 & tool.exe @args
+$exitCode = $LASTEXITCODE
 
-if ($LASTEXITCODE -ne 0) {
-    throw "tool.exe failed with exit code $LASTEXITCODE"
+if ($exitCode -ne 0) {
+    throw "tool.exe failed with exit code $exitCode"
 }
 ```
 
-Some tools intentionally use nonzero codes for nonfatal states; honor that tool's documented contract.
+But interpret exit codes using the target tool's contract. Some tools use nonzero codes for informational or successful states. `robocopy` is a common Windows example.
+
+PowerShell also provides `$PSNativeCommandUseErrorActionPreference` in modern versions. If you temporarily change it for a tool with unusual exit-code semantics, scope the change narrowly.
 
 ## Native stdin encoding
 
 PowerShell uses `$OutputEncoding` when piping text into native applications.
-
-Do not change it globally for one tool. Use a scoped change and restore it:
 
 ```powershell
 $oldOutputEncoding = $OutputEncoding
@@ -69,31 +207,28 @@ finally {
 }
 ```
 
-Choose 936/932/949/950/UTF-8 because the target program requires it, not because of the Windows language.
+Choose the encoding because the target program requires it, not because of Windows language.
 
-## Native stdout/stderr encoding
+## Native stdout/stderr and binary streams
 
-Native programs may emit UTF-8, a legacy Windows code page, or a tool-specific encoding. Inspect the tool's documentation or verified behavior.
+Native programs may emit UTF-8, a legacy Windows code page, or a tool-specific encoding. Do not assume `$OutputEncoding` controls native stdout decoding; it controls PowerShell -> native stdin.
 
-Do not assume that changing `$OutputEncoding` fixes native output decoding: `$OutputEncoding` controls PowerShell -> native stdin, not file output and not every native stdout decoding path.
+PowerShell 7.4+ preserves raw byte-stream data when native stdout is redirected directly to a file or when native byte-stream output is piped to another native command. This matters for binary payloads such as archives.
 
-## CMD and batch files
-
-`.cmd` and `.bat` ultimately execute under `cmd.exe` semantics. Their argument parsing, percent expansion, metacharacters, and console code page are not the same as PowerShell.
-
-For untrusted or complex arguments, prefer a native executable/API that supports structured arguments rather than constructing a batch command string.
+Do not apply text encoding conversions to a byte-stream pipeline unless the data is actually text.
 
 ## Destructive native commands
 
 For native tools:
 
-1. Use the tool's own dry-run/preview flag when available.
-2. Otherwise inspect and display the exact target set.
-3. Require confirmation when the operation is destructive and not already clearly authorized.
-4. Never append PowerShell `-WhatIf` mechanically to a native command.
+1. use the tool's own dry-run/preview flag when available;
+2. otherwise inspect the exact target set;
+3. require confirmation when the destructive action is not already clearly authorized;
+4. never append PowerShell `-WhatIf` mechanically to a native executable.
 
 ## Related references
 
+- `quoting-and-escaping.md` for parser-specific quoting and JSON/nested-shell patterns.
 - `windows-text-encoding.md` for code pages, BOM, console and file boundaries.
-- `powershell-vs-cmd.md` for shell-specific quoting and parsing.
-- `common-pitfalls.md` for common Windows shell mistakes.
+- `powershell-vs-cmd.md` for shell-selection differences.
+- `common-pitfalls.md` for recurring Windows shell mistakes.

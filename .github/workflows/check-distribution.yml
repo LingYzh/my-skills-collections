@@ -20,6 +20,14 @@ jobs:
               with:
                   python-version: "3.12"
 
+            - name: Compile PowerShell Skill helper scripts
+              run: python -m py_compile skills/powershell-windows-cli/scripts/*.py
+
+            - name: Smoke-test PowerShell static checker
+              run: |
+                  python skills/powershell-windows-cli/scripts/validate_ps.py -c "chcp 65001"
+                  python skills/powershell-windows-cli/scripts/validate_ps.py -c 'cmd /c "tool.exe $path"'
+
             - name: Build generic Skill ZIPs
               run: python scripts/package-skills.py
 

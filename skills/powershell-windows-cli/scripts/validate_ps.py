@@ -384,6 +384,89 @@ def check_encoding_changes(code: str) -> list[dict]:
 
     return findings
 
+
+def check_native_invocation_risks(code: str) -> list[dict]:
+    """Warn about fragile native-command boundaries and parser layering."""
+    findings = []
+
+    for line_no, line in enumerate(code.splitlines(), start=1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+
+        if re.search(r"\bStart-Process\b.*-ArgumentList\b", stripped, re.IGNORECASE):
+            findings.append(
+                {
+                    "line": line_no,
+                    "line_text": stripped,
+                    "type": "start_process_argumentlist_boundary",
+                    "message": (
+                        "Start-Process -ArgumentList is joined into a command-line string. "
+                        "Do not assume array values preserve argv boundaries; verify target quoting."
+                    ),
+                }
+            )
+
+        if re.search(r"\bcmd(?:\.exe)?\s+/[cC]\b", stripped) and "$" in stripped:
+            findings.append(
+                {
+                    "line": line_no,
+                    "line_text": stripped,
+                    "type": "dynamic_cmd_c_boundary",
+                    "message": (
+                        "Dynamic PowerShell values are crossing into cmd /c string parsing. "
+                        "Prefer direct native invocation or a structured API when possible."
+                    ),
+                }
+            )
+
+        stop_index = stripped.find("--%")
+        if stop_index >= 0:
+            remainder = stripped[stop_index + 3 :]
+            if "$" in remainder or "$(" in remainder:
+                findings.append(
+                    {
+                        "line": line_no,
+                        "line_text": stripped,
+                        "type": "dynamic_stop_parsing_usage",
+                        "message": (
+                            "--% stops normal PowerShell parsing. PowerShell variables and "
+                            "subexpressions after it won't behave like ordinary dynamic arguments."
+                        ),
+                    }
+                )
+
+    changes_native_passing = bool(
+        re.search(r"\$PSNativeCommandArgumentPassing\s*=", code, re.IGNORECASE)
+    )
+    if changes_native_passing and "finally" not in code.lower():
+        findings.append(
+            {
+                "line": None,
+                "line_text": None,
+                "type": "unscoped_native_argument_mode_change",
+                "message": (
+                    "Changing $PSNativeCommandArgumentPassing changes session native-argument "
+                    "semantics. Prefer the default or scope and restore intentional overrides."
+                ),
+            }
+        )
+
+    if re.search(r"\bpwsh(?:\.exe)?\b.*\s-Command\b", code, re.IGNORECASE):
+        findings.append(
+            {
+                "line": None,
+                "line_text": None,
+                "type": "nested_pwsh_command_string",
+                "message": (
+                    "Nested pwsh -Command adds another PowerShell parser layer. "
+                    "Prefer -File with parameters for reusable or complex dynamic input."
+                ),
+            }
+        )
+
+    return findings
+
 def validate(code: str) -> dict:
     """Run all checks and return a structured report."""
     findings = []
@@ -395,6 +478,7 @@ def validate(code: str) -> dict:
     findings.extend(check_suspicious_patterns(code))
     findings.extend(check_quoting(code))
     findings.extend(check_encoding_changes(code))
+    findings.extend(check_native_invocation_risks(code))
 
     dangerous = [f for f in findings if f["type"] == "dangerous_cmdlet"]
 

@@ -1,8 +1,8 @@
 {
     "name": "powershell-windows-cli",
     "displayName": "PowerShell + Windows CLI",
-    "version": "1.1.0-personal.1",
-    "description": "PowerShell 7 / Windows PowerShell 5.1 and CMD/Batch guidance for AI agents, focused on Windows text-encoding boundaries, UTF-8/BOM, legacy CP932/936/949/950, native tools, and safe shell execution.",
+    "version": "1.2.0-personal.2",
+    "description": "PowerShell 7 / Windows PowerShell 5.1 and CMD/Batch guidance for AI agents, focused on Windows encoding compatibility, native argument passing, quoting/escaping, legacy CP932/936/949/950, and safe shell execution.",
     "author": {
         "name": "LingYzh",
         "url": "https://github.com/LingYzh"
@@ -16,7 +16,8 @@
         "windows",
         "cmd",
         "encoding",
-        "gbk",
+        "quoting",
+        "native-cli",
         "claude-code"
     ],
     "skills": [

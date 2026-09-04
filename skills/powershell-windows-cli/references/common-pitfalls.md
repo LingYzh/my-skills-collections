@@ -46,8 +46,13 @@ Invoke-Expression "Get-Process -Name $name"
 # Safer
 Get-Process -Name $name
 
-# For external programs
-Start-Process -FilePath 'myapp.exe' -ArgumentList '--input', $userInput
+# For a directly invokable native program, keep arguments separate.
+$nativeArgs = @(
+    '--input'
+    $userInput
+)
+
+& 'myapp.exe' @nativeArgs
 ```
 
 ### 4. Aliases in scripts
@@ -252,3 +257,42 @@ When editing an existing text file:
 2. If the encoding is uncertain, detect or inspect before writing.
 3. Treat conversion to UTF-8/another encoding as an explicit migration.
 4. Verify that downstream compilers, scripts, services, and legacy tools accept the new encoding.
+
+
+### Start-Process ArgumentList is not a true argv array
+
+Do not assume this:
+
+```powershell
+Start-Process -FilePath 'tool.exe' -ArgumentList '--name', $value
+```
+
+preserves two independent argv elements. `Start-Process` joins `ArgumentList` values into one command-line string. If arguments contain spaces or quotes, quoting still has to match the target application's parser.
+
+Use `Start-Process` when its process-control features are needed, such as elevation, credentials, redirection, a new window, or waiting. For ordinary native execution, direct invocation is usually simpler.
+
+On modern .NET runtimes, `System.Diagnostics.ProcessStartInfo.ArgumentList` is a separate API that performs argument escaping. Feature-detect it before use; do not assume the property exists in Windows PowerShell 5.1's .NET Framework runtime.
+
+### Avoid unnecessary cmd /c layers
+
+If an executable can be invoked directly, do this:
+
+```powershell
+& git @('status', '--short')
+```
+
+rather than:
+
+```powershell
+cmd /c "git status --short"
+```
+
+Every added shell adds another parser, another quoting grammar, and possibly another encoding boundary.
+
+### Stop-parsing is for static native syntax
+
+The Windows-only `--%` token is useful for native command lines with PowerShell-sensitive punctuation, but after it PowerShell largely stops interpreting the remaining text. Do not use it when you need normal PowerShell variable/subexpression composition.
+
+### Batch files are raw-string boundaries
+
+On Windows, arguments passed to `.bat` or `.cmd` ultimately go through `cmd.exe` raw command-line parsing. Treat dynamic or untrusted arguments as higher risk than direct executable argv-style calls.

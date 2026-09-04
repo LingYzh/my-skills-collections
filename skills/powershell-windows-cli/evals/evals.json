@@ -1,6 +1,6 @@
 {
   "name": "powershell-windows-cli",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "evals": [
     {
       "name": "list_stopped_automatic_services",
@@ -422,6 +422,165 @@
         {
           "type": "script_exit",
           "command": "python3 scripts/validate_ps.py -c \"chcp 65001\"",
+          "expected_exit": 0
+        }
+      ]
+    },
+    {
+      "name": "direct_native_json_argument",
+      "prompt": "In PowerShell 7, call tool.exe with --payload followed by one JSON argument stored in $json. Avoid Invoke-Expression and unnecessary cmd.exe.",
+      "checks": [
+        {
+          "type": "contains",
+          "value": "$json"
+        },
+        {
+          "type": "regex",
+          "value": "&\\s+.*tool"
+        },
+        {
+          "type": "not_contains",
+          "value": "Invoke-Expression"
+        },
+        {
+          "type": "not_contains",
+          "value": "cmd /c"
+        }
+      ]
+    },
+    {
+      "name": "start_process_argumentlist_not_true_argv",
+      "prompt": "Is Start-Process -ArgumentList an argv-safe array interface for values containing spaces and quotes?",
+      "checks": [
+        {
+          "type": "contains",
+          "value": "Start-Process"
+        },
+        {
+          "type": "regex",
+          "value": "(?i)join|string|command.?line"
+        },
+        {
+          "type": "regex",
+          "value": "(?i)quote|quoting"
+        }
+      ]
+    },
+    {
+      "name": "psnative_argument_passing_windows_mode",
+      "prompt": "Explain $PSNativeCommandArgumentPassing on PowerShell 7.3+ Windows, especially what happens for .bat and .cmd files.",
+      "checks": [
+        {
+          "type": "contains",
+          "value": "Windows"
+        },
+        {
+          "type": "contains",
+          "value": "Legacy"
+        },
+        {
+          "type": "regex",
+          "value": "\\.bat|\\.cmd"
+        }
+      ]
+    },
+    {
+      "name": "stop_parsing_not_for_dynamic_values",
+      "prompt": "Can I use --% and then freely interpolate $userValue and $(Get-Date) into a native command?",
+      "checks": [
+        {
+          "type": "contains",
+          "value": "--%"
+        },
+        {
+          "type": "regex",
+          "value": "(?i)stop.*parsing|literal"
+        },
+        {
+          "type": "regex",
+          "value": "(?i)dynamic|variable|subexpression"
+        }
+      ]
+    },
+    {
+      "name": "avoid_dynamic_cmd_c",
+      "prompt": "I have a user-provided file path in $path and want to run a normal EXE. Should I build cmd /c \"tool.exe $path\"?",
+      "checks": [
+        {
+          "type": "not_contains",
+          "value": "Invoke-Expression"
+        },
+        {
+          "type": "regex",
+          "value": "(?i)direct|argument|array|splat"
+        },
+        {
+          "type": "regex",
+          "value": "(?i)cmd.*avoid|avoid.*cmd|not.*cmd"
+        }
+      ]
+    },
+    {
+      "name": "nested_pwsh_prefer_file",
+      "prompt": "For a reusable multi-line PowerShell task with several dynamic parameters, should an agent build a giant pwsh -Command string?",
+      "checks": [
+        {
+          "type": "contains",
+          "value": "-File"
+        },
+        {
+          "type": "regex",
+          "value": "(?i)parameter|param"
+        },
+        {
+          "type": "regex",
+          "value": "(?i)quot|parser|layer"
+        }
+      ]
+    },
+    {
+      "name": "native_binary_redirection_ps74",
+      "prompt": "In PowerShell 7.4+, can native stdout redirected directly to a file preserve raw byte-stream data?",
+      "checks": [
+        {
+          "type": "contains",
+          "value": "7.4"
+        },
+        {
+          "type": "regex",
+          "value": "(?i)byte|binary"
+        },
+        {
+          "type": "regex",
+          "value": "(?i)redirect|pipe"
+        }
+      ]
+    },
+    {
+      "name": "robocopy_nonzero_exit_contract",
+      "prompt": "Should an agent treat every nonzero robocopy exit code as a fatal error just because $LASTEXITCODE is nonzero?",
+      "checks": [
+        {
+          "type": "contains",
+          "value": "robocopy"
+        },
+        {
+          "type": "contains",
+          "value": "$LASTEXITCODE"
+        },
+        {
+          "type": "regex",
+          "value": "(?i)document|contract|nonzero|success"
+        }
+      ]
+    },
+    {
+      "name": "validator_warns_dynamic_cmd_c",
+      "prompt": "INTERNAL: validate this PowerShell: cmd /c \"tool.exe $path\"",
+      "checks": [
+        {
+          "type": "script_exit",
+          "command": "python3 scripts/validate_ps.py -c 'cmd /c \"tool.exe $path\"'",
           "expected_exit": 0
         }
       ]

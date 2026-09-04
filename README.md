@@ -14,7 +14,7 @@
 | --- | --- | --- | --- | --- | --- |
 | [`vue-best-practices`](./skills/vue-best-practices/) | Vue 3 / Composition API / uni-app Vue 开发实践 | **v18.6.0-personal.6** | **v18.0.0** | 🔵 **Customized** | ✅ **Active** |
 | [`grilling`](./skills/grilling/) | 需求/方案压力测试与执行前高返工风险歧义澄清 | **v1.2.0-personal.3** | **unversioned @ 85f83d3** | 🔵 **Customized** | ✅ **Active** |
-| [`powershell-windows-cli`](./skills/powershell-windows-cli/) | PowerShell / CMD 与 Windows 编码兼容、native CLI 使用规范 | **v1.1.0-personal.1** | **snapshot @ 90a5953** | 🔵 **Customized** | ✅ **Active** |
+| [`powershell-windows-cli`](./skills/powershell-windows-cli/) | PowerShell / CMD 与 Windows 编码兼容、native CLI 使用规范 | **v1.2.0-personal.2** | **snapshot @ 90a5953** | 🔵 **Customized** | ✅ **Active** |
 
 ## Installation
 
@@ -68,7 +68,7 @@ GitHub tag `v*` 会触发 Release workflow，从根 `skills/<name>/` 分别生�
 ```text
 grilling-1.2.0-personal.3.zip
 vue-best-practices-18.6.0-personal.6.zip
-powershell-windows-cli-1.1.0-personal.1.zip
+powershell-windows-cli-1.2.0-personal.2.zip
 SHA256SUMS.txt
 ```
 
@@ -115,7 +115,7 @@ references/
 
 - **Local path:** [`skills/powershell-windows-cli/`](./skills/powershell-windows-cli/)
 - **Upstream:** [`UncertaintyDeterminesYou4ndMe/powershell-windows-cli-agent-skill`](https://github.com/UncertaintyDeterminesYou4ndMe/powershell-windows-cli-agent-skill)
-- **Local version:** `1.1.0-personal.1`
+- **Local version:** `1.2.0-personal.2`
 - **Upstream version:** unversioned
 - **Sync state:** Customized
 - **License:** MIT
@@ -123,7 +123,7 @@ references/
 - **Upstream baseline SKILL.md blob:** `7c9d88617131f09b83502533b7a839dc0083650e`
 - **Upstream baseline references tree:** `1437dca59e89040a467a3247f2b9956cc02cb240`
 
-主要个人化方向：以 Windows 文本编码边界为核心，区分 PowerShell 5.1/7+、脚本源文件、普通文件、Console、PowerShell→native stdin 与 native stdout/stderr；重点兼容 UTF-8/BOM 与 CP932/936/949/950，默认保留 legacy 项目文件编码，禁止用 `chcp` 或系统 locale 作为万能编码判断；同时补强 native executable 参数边界、`$LASTEXITCODE`、`$OutputEncoding` 作用域以及 `-WhatIf`/native dry-run 的区别。
+主要个人化方向：以 Windows 文本编码边界为核心，区分 PowerShell 5.1/7+、脚本源文件、普通文件、Console、PowerShell→native stdin 与 native stdout/stderr；重点兼容 UTF-8/BOM 与 CP932/936/949/950，默认保留 legacy 项目文件编码。进一步强化 native executable 参数传递、`$PSNativeCommandArgumentPassing`、`Start-Process -ArgumentList`、`cmd /c`/`.bat` raw-string 边界、JSON 与 nested `pwsh -Command` quoting、`--%` 限制、`$LASTEXITCODE` 和 PowerShell 7.4+ native byte-stream 行为。
 
 ## Distribution Architecture
 

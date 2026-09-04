@@ -1,15 +1,15 @@
 ---
 name: powershell-windows-cli
 description: |
-  PowerShell and Windows Command Prompt (CMD/Batch) expert skill with strong Windows text-encoding compatibility guidance. Use for PowerShell, pwsh, powershell.exe, CMD/Batch, Windows shell execution, native Windows CLI tools, path/registry/service/admin tasks, and especially mojibake, GBK/CP936, Big5/CP950, Shift-JIS/CP932, Korean CP949, UTF-8/BOM, console code-page, or native stdin/stdout encoding problems.
-  Trigger especially when an agent must generate or execute Windows commands, preserve legacy project-file encodings, diagnose Chinese/Japanese/Korean Windows text corruption, or cross boundaries between PowerShell strings, files, consoles, and native executables.
+  PowerShell and Windows Command Prompt (CMD/Batch) expert skill with strong Windows text-encoding and native-command boundary guidance. Use for PowerShell, pwsh, powershell.exe, CMD/Batch, Windows shell execution, native Windows CLI tools, quoting/escaping, JSON arguments, nested shells, path/registry/service/admin tasks, and especially mojibake, GBK/CP936, Big5/CP950, Shift-JIS/CP932, Korean CP949, UTF-8/BOM, console code-page, or native stdin/stdout encoding problems.
+  Trigger especially when an agent must generate or execute Windows commands, preserve legacy project-file encodings, diagnose Chinese/Japanese/Korean Windows text corruption, pass complex arguments to native tools, call cmd/batch/pwsh recursively, or cross boundaries between PowerShell strings, files, consoles, and native executables.
 license: MIT
 metadata:
     author: github.com/UncertaintyDeterminesYou4ndMe
     customized_by: github.com/LingYzh
     upstream_commit: "90a59539db1d7b4406a32cd7b337e76bbe7d6a3c"
     upstream_skill_blob: "7c9d88617131f09b83502533b7a839dc0083650e"
-    version: "1.1.0-personal.1"
+    version: "1.2.0-personal.2"
 ---
 
 # PowerShell + Windows CMD Skill
@@ -67,6 +67,24 @@ Default behavior:
 - Treat `chcp`, `[Console]::InputEncoding`, `[Console]::OutputEncoding`, and `$OutputEncoding` as different controls. Do not use one as a universal encoding fix.
 - For detailed rules, load `references/windows-text-encoding.md`.
 
+## Native invocation gate
+
+Before generating or executing a native command from PowerShell, identify the target type and avoid unnecessary shell layers.
+
+Decision order:
+
+1. If the target is a native executable, prefer direct invocation such as `& $exe @args`.
+2. If the target is a PowerShell script, prefer `pwsh -File script.ps1` / direct script invocation over constructing a nested `-Command` string.
+3. Use `cmd /c` only when CMD semantics are actually required, such as a built-in CMD command or legacy batch behavior.
+4. Treat `.bat` / `.cmd` as raw command-line-string boundaries. Do not pass untrusted or complex dynamic input through them when a structured executable/API path exists.
+5. Treat `Start-Process -ArgumentList` as a command-line string interface, not a true argv array. Use it for process-control features such as elevation/window/credential behavior, not as the default cure for quoting.
+6. On PowerShell 7.3+, be aware of `$PSNativeCommandArgumentPassing` (`Legacy`, `Standard`, `Windows`). On Windows, the default `Windows` mode falls back to legacy behavior for `cmd.exe`, `.bat`, `.cmd`, and several legacy executables.
+7. Use `--%` only for mostly static Windows-native argument text. It stops normal PowerShell parsing, supports very little dynamic composition, and is not a general quoting strategy.
+8. For JSON, long text, or nested quoting, prefer one clear data boundary: one argument, stdin, or a temporary file if the target supports it.
+9. Always interpret native exit codes using the target tool's documented contract. Nonzero does not universally mean failure.
+
+Load `references/native-command-execution.md` and `references/quoting-and-escaping.md` for complex native invocations.
+
 **Definitions:**
 - *New work* — scripts authored today on Windows 10/11, Server 2016+, or cross-platform scenarios. Use `pwsh.exe` unless the target lacks PowerShell 7.
 - *Destructive operation* — any command that deletes, overwrites, stops, restarts, reconfigures system state, or modifies the registry. Preview impact first. Use `-WhatIf` / `-Confirm` only when the PowerShell command supports `ShouldProcess`; otherwise use the native tool's own dry-run/preview mechanism or explicit user confirmation.
@@ -80,7 +98,7 @@ Default behavior:
 3. **Preserve existing file encoding by default.** Do not silently modernize GBK/CP936, Big5/CP950, Shift-JIS/CP932, CP949, UTF-8 BOM, or other established project files.
 4. **Know the PowerShell version differences.** PowerShell 7+ defaults to UTF-8 without BOM for text output; Windows PowerShell 5.1 has inconsistent cmdlet defaults and `-Encoding UTF8` means UTF-8 with BOM.
 5. **Scope console/native encoding changes.** Do not globally run `chcp 65001` or `chcp 936`, or permanently mutate `$OutputEncoding`, as a generic mojibake fix. Inspect the target program and restore temporary changes.
-6. **Keep native command boundaries explicit.** Prefer argument arrays/splatting over command-string construction, avoid `Invoke-Expression`, and inspect `$LASTEXITCODE` after native tools.
+6. **Keep native command boundaries explicit.** Prefer direct native invocation with separate PowerShell arguments over command-string construction. Do not assume `Start-Process -ArgumentList` preserves argv boundaries. Avoid `Invoke-Expression`, minimize `cmd /c` / nested `pwsh -Command`, and inspect `$LASTEXITCODE` according to the target tool contract.
 7. **Avoid ambiguous aliases** in reusable scripts and examples. Use full cmdlet names.
 8. **Quote and compose paths safely.** Prefer `Join-Path` / `-LiteralPath` where appropriate instead of manual path concatenation.
 9. **Prefer CIM over legacy WMI** for new work when compatible.
@@ -292,13 +310,14 @@ For detailed topics, load the relevant reference file:
 - `references/active-directory.md` — AD users, groups, computers, and common RSAT cmdlets.
 - `references/common-pitfalls.md` — frequent mistakes, error messages, and how to fix them.
 - `references/windows-text-encoding.md` — file/script/console/native encoding boundaries, UTF-8 BOM behavior, and CP932/936/949/950 compatibility.
-- `references/native-command-execution.md` — safe native executable invocation, argument boundaries, `$LASTEXITCODE`, and stdin/stdout encoding.
+- `references/native-command-execution.md` — safe native executable invocation, PowerShell 7.3 argument-passing modes, `Start-Process`, CMD/batch boundaries, `$LASTEXITCODE`, and stdin/stdout encoding.
+- `references/quoting-and-escaping.md` — PowerShell/CMD/native quoting, JSON arguments, stop-parsing, nested shells, and how to avoid multi-layer escaping.
 
 ## Bundled tools
 
 This skill includes two helper scripts in `scripts/`:
 
-- `scripts/validate_ps.py` — lightweight static analysis of generated PowerShell code. Use it to check dangerous cmdlets, deprecated aliases/WMI, quoting, missing error handling, and risky console/native encoding changes.
+- `scripts/validate_ps.py` — lightweight static analysis of generated PowerShell code. Use it to check dangerous cmdlets, deprecated aliases/WMI, missing error handling, risky console/native encoding changes, and fragile native invocation patterns.
 - `scripts/generate_template.py` — generate common PowerShell/CMD command templates from a user intent and parameters.
 
 When the user wants to validate a script or generate a boilerplate command, invoke the appropriate script and present its output.
